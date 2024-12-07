@@ -20,12 +20,12 @@ install-uv:
 		 curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="$$HOME/.local/bin" sh ; \
 	fi
 
-install-prod:
+install-prod:install-uv
 	@echo "${YELLOW}=========> Installing dependencies...${NC}"
 	@$(UV) sync --no-group dev --no-group docs
 	@echo "${GREEN}Dependencies installed.${NC}"
 
-install-dev:
+install-dev:install-uv
 	@echo "${YELLOW}=========> Installing dependencies...\n  \
 	 Development dependencies (dev & docs) will be installed by default in install-dev.${NC}"
 	@$(UV) sync
