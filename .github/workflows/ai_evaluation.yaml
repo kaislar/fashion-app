@@ -42,6 +42,7 @@ jobs:
         shell: bash
         run: |
           make install-dev
+          make clean-uv-cache
       - name: Install NPM dependencies
         shell: bash
         run: |

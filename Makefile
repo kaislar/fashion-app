@@ -80,9 +80,14 @@ install-npm-dependencies: install-nvm
 
 ####### local CI / CD ########
 # uv caching :
-cache-uv:
-	@echo "${YELLOW}=========> Caching uv...${NC}"
-	@$(UV) cache prune --ci
+prune-uv:
+	@echo "${YELLOW}=========> Prune uv cache...${NC}"
+	@$(UV) cache prune
+# clean uv caching
+clean-uv-cache:
+	@echo "${YELLOW}=========> Cleaning uv cache...${NC}"
+	@$(UV) cache clean
+
 # Github actions locally
 install-act:
 	@echo "${YELLOW}=========> Installing github actions act to test locally${NC}"
