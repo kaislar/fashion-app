@@ -1,0 +1,36 @@
+services:
+  promptfoo:
+    container_name: "promptfoo_container"
+    image: ghcr.io/promptfoo/promptfoo:main
+    restart: always
+    environment:
+      - PROMPTFOO_SHARE_STORE_TYPE="filesystem"
+      - PROMPTFOO_SHARE_TTL=2419200
+    expose:
+      - 3000
+    ports:
+      - "3000:3000"
+    volumes:
+      - ~/.promptfoo:/home/.promptfoo
+
+
+#  mlflow:
+#    container_name: "mlflow_container"
+#    image: ghcr.io/mlflow/mlflow:v2.15.1
+#    command: "mlflow ui --host 0.0.0.0 -p 5001"
+#    restart: always
+#    expose:
+#      - 5001
+#    ports:
+#      - "5001:5001"
+#    volumes:
+#      - mlflow_runs:/mlruns
+#      - mlflow_artifacts:/mlartifacts
+
+volumes:
+  promptfoo_data:
+    name: "promptfoo_data"
+#  mlflow_runs:
+#    name: "mlflow_runs"
+#  mlflow_artifacts:
+#    name: "mlflow_artifacts"
