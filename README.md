@@ -30,9 +30,6 @@ Click on [<kbd>Use this template</kbd>](https://github.com/aminedjeghri/ai-cloud
 This project is a generative ai template. It contains the following features: LLMs, information extraction, chat, rag & evaluation.
 It uses LLMs(local or cloud),streamlit (with and without fastapi) & Promptfoo as an evaluation and redteam framework for your AI system.
 
-
-# table with three columns for three photos
-
 | Evaluation with promptfoo                            | Streamlit                                            |
 |------------------------------------------------------|------------------------------------------------------|
 | <img src="./assets/promptfoo_img.png" width="500" /> | <img src="./assets/streamlit_img.png" width="500" /> |
