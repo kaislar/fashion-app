@@ -30,7 +30,7 @@ jobs:
   evaluate:
     runs-on: ubuntu-latest
     container:
-      image: aminedjeghri/python3.11-nvm22.08:latest
+      image: aminedjeghri/python-uv-node:latest
     steps:
       - uses: actions/checkout@v4
         with:

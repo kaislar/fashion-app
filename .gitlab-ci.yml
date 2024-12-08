@@ -1,5 +1,5 @@
 default:
-  image: aminedjeghri/python3.11-nvm22.08:latest
+  image: aminedjeghri/python-uv-node:latest
 
 stages:
   - evaluate
