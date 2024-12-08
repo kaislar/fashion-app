@@ -45,10 +45,10 @@ run-app:
 
 pre-commit-install:
 	@echo "${YELLOW}=========> Installing pre-commit...${NC}"
-	pre-commit install
+	$(UV) run pre-commit install
 pre-commit:
 	@echo "${YELLOW}=========> Running pre-commit...${NC}"
-	pre-commit run --all-files
+	$(UV) run pre-commit run --all-files
 
 ###### NVM & npm packages ########
 install-nvm:
