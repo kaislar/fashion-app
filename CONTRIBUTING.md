@@ -38,7 +38,7 @@ By participating, you are expected to uphold this code. Please report unacceptab
 ### 4.1 File structure (🌳 Tree)
 Check the readme file.
 
-###  ⚙️ 4.2 Steps for Installation (Contributors and maintainers)
+### 4.2 Steps for Installation (Contributors and maintainers)
 
 - The first step is [to install, read and test the project as a user](README.md#-steps-for-installation-users)
 - Then you can either [develop in a container](#22-or-develop-in-a-container) or [develop locally](#21-local-development)
