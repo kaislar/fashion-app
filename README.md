@@ -83,14 +83,15 @@ The following files are used in the contribution pipeline:
 - ``.env.example``: example of the .env file.
 - ``.env`` : contains the environment variables used by the app.
 - ``Makefile``: contains the commands to run the app locally.
-- ``Dockerfile``: the dockerfile used to build the docker image. It uses the Makefile commands to run the app.
+- ``Dockerfile``: the dockerfile used to build the project inside a container. It uses the Makefile commands to run the app.
 - ``.pre-commit-config.yaml``: pre-commit hooks configuration file
 - ``pyproject.toml``: contains the pytest, ruff & other configurations.
-- ``log_config.py``: logging configuration file for the project. This logger is used in the backend and can be used in
+- ``src/api/log_config.py`` and ``src/main_backend.py``: uvicorn (fastapi) logging configuration.
+- ``src/utils.py``: logger (using logguru) and settings using pydantic.
   the frontend.
-- .github/workflows/**.yml: GitHub actions configuration files.
-- .gitlab-ci.yml: Gitlab CI configuration files.
-
+- `.github/workflows/**.yml`: GitHub actions configuration files.
+- `.gitlab-ci.yml`: Gitlab CI configuration files.
+- ``.gitignore``: contains the files to ignore in the project.
 
 ### 1.1. Local Prerequisites
 
@@ -100,7 +101,7 @@ The following files are used in the contribution pipeline:
 - Create a ``.env`` file *(take a look at the ``.env.example`` file)*
 
 
-### ⚙️ Steps for Installation (Users)
+### 1.2 ⚙️ Steps for Installation (Users)
 #### App (AI, FastAPI, Streamlit)
 
 1. To install the app, run `make install-prod`.
@@ -173,8 +174,8 @@ Steps to evaluate a rag system:
 - Run docker with the right port bindings.
 - Since the app is running in docker and using streamlit, the Internal and External URL addresses won't work. You need to access the app with localhost:forwarded_port
 
-### ⚙️ Steps for Installation (Contributors and maintainers)
+### 1.3 ⚙️ Steps for Installation (Contributors and maintainers)
 Check the [CONTRIBUTING.md](CONTRIBUTING.md) file for more information.
 
-## Contributing
+## 2. Contributing
 Check the [CONTRIBUTING.md](CONTRIBUTING.md) file for more information.
