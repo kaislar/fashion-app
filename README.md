@@ -54,8 +54,10 @@ It uses LLMs(local or cloud),streamlit (with and without fastapi) & Promptfoo as
 
 **CI/CD & Maintenance tools:**
 
-- [x] CI/CD pipelines: ``.github/workflows`` for GitHub and ``.gitlab-ci.yml`` for GitLab
-- [x] Local CI/CD pipelines: GitHub Actions using ``github act`` and local GitLab CI using ``gitlab-ci-local``
+- [x] CI/CD pipelines: ``.github/workflows`` for GitHub (Testing the AI system, local models with Ollama and the dockerized app)
+- [x] Local CI/CD pipelines: GitHub Actions using ``github act``
+- [x] GitHub Actions for deploying to GitHub Pages with mkdocs gh-deploy
+- [x] Dependabot ``.github/dependabot.yml`` for automatic dependency and security updates
 
 **Documentation tools:**
 
@@ -64,13 +66,13 @@ It uses LLMs(local or cloud),streamlit (with and without fastapi) & Promptfoo as
 
 
 Upcoming features:
-
+- [ ] add RAG again
 - [ ] optimize caching in CI/CD
 - [ ] [Pull requests templates](https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/creating-a-pull-request-template-for-your-repository)
 - [ ] Additional MLOps templates: https://github.com/fmind/mlops-python-package
 - [ ] Add MLFlow
 - [ ] add Langfuse
-- [ ] deploy gh pages in actions
+
 
 ## 1. Getting started
 This project contains two parts:
@@ -93,6 +95,44 @@ The following files are used in the contribution pipeline:
 - `.gitlab-ci.yml`: Gitlab CI configuration files.
 - ``.gitignore``: contains the files to ignore in the project.
 
+Tree:
+
+```
+
+├── .env.example # example of the .env file
+├── .env # contains the environment variables
+├── Dockerfile # the dockerfile used to build the project inside a container. It uses the Makefile commands to run the app.
+├── docker-compose.yml # docker-compose configuration file (used to run the frontend and backend in docker)
+├── Makefile # contains the commands to run the app (like running the frontend, tests, installing packages, docker...)
+├── assets
+├── pyproject.toml # uv, dependencies, pytest, ruff & other configurations for the package
+├── uv.lock # uv lock file
+├── .pre-commit-config.yaml # pre-commit hooks configuration file
+├── .gitignore # contains the files to ignore in the project
+├── .github
+│   ├── dependabot.yml # dependabot configuration file
+│   └── workflows # GitHub actions configuration files
+│       └── test-deploy.yaml
+├── mkdocs.yml # mkdocs configuration file
+├── scripts
+│   └── gen_doc_stubs.py # mkdocs : generate documentation stubs
+├── src
+│   ├── api
+│   ├── evaluation
+│   ├── main_backend.py
+│   ├── main_frontend.py
+│   ├── ml
+│   ├── settings.py
+│   └── utils.py # logger (using logguru) and settings using pydantic.
+├── CODE_OF_CONDUCT.md
+├── CONTRIBUTING.md
+├── README.md
+├── LICENSE
+└── tests
+```
+
+
+
 ### 1.1. Local Prerequisites
 
 - Ubuntu 22.04 or MacOS
@@ -103,20 +143,24 @@ The following files are used in the contribution pipeline:
 
 ### 1.2 ⚙️ Steps for Installation (Users)
 #### App (AI, FastAPI, Streamlit)
+#### Docker (deprecated, will be updated soon, missing the .env and models steps) :
+Run this command : `make docker-compose` then go to [http://localhost:8501](http://localhost:8501)
 
+#### Local :
 1. To install the app, run `make install-prod`.
 2. Choose one of the following options:
-   - Local model: we use Ollama that simulates OpenAI or Azure OpenAI. The model that is used is `phi3:3.8b-mini-4k-instruct-q4_K_M` but can be changed.
-     - Read about how the app handles different providers and how to emulate OpenAI if you use open source models.
-     - Update the ``.env`` file *(take a look at the ``.env.example`` file)*
-     - Install Ollama (for openai) `make install-ollama` or ollamazure (for azure)
-     - Download the model, run `make download-ollama-model`. It will download the model present in the `OLLAMA_MODEL_NAME` var in the ``.env`` file.
-     - Run ollama to emulate openai : `make run-ollama` or ollamazure to emulate azure openai : `make run-ollamazure`
+   - **Local model**: we use Ollama and litellm to run local models. The default model is `qwen2.5:0.5b` which is a very lightweight model but can be changed.
+     - Create a ``.env`` file *(You can copy and paste the ``.env.example`` file with `cp .env.example .env`)*
+     - Install Ollama (for openai) `make install-ollama`
+     - Download the model, run `make download-ollama-model`. It will download the model present in the `OLLAMA_MODEL_NAME` var in the ``.env`` file (default is `qwen2.5:0.5b`).
+     - Run ollama to emulate openai : `make run-ollama`
      - Run `make test-ollama`. You should see an output with a response.
-   - Or Cloud model: OpenAI or Azure OpenAI:
-     - Update the ``.env`` file *(take a look at the ``.env.example`` file)*
+     - Discuss with the model : `make chat-ollama`
+   - **Cloud model:**
+     - Create/update the ``.env`` file *(You can copy and paste the ``.env.example`` file with `cp .env.example .env`)*
+     - Follow the litellm [naming convention](https://docs.litellm.ai/docs/providers).
 
-3. Run `test-llm-client` to check if your the LLM responds.
+3. Run `make test-inference-llm` to check if your LLM responds.
 4. Run the app:
 - To run the app with Streamlit (and without fastapi), run `make run-frontend`
 - To run the app with both Streamlit and FastAPI, run `make run-app`

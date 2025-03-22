@@ -62,8 +62,8 @@ Check the readme file.
 ###  4.3. Run the test to see if everything is working
 - Test the package with :
     - ``make test`` will run all the tests (requires .env file)
- 
-### 4.4. Pushing your work      
+
+### 4.4. Pushing your work
 - Before you start working on an issue, please comment on (or create) the issue and wait for it to be assigned to you. If
 someone has already been assigned but didn't have the time to work on it lately, please communicate with them and ask if
 they're still working on it. This is to avoid multiple people working on the same issue.
@@ -75,18 +75,17 @@ pull request. For a detailed pull request tutorial, see this guide.
 2. Before commiting your code :
    - Run ``make test`` to run the tests
    - Run ``make pre-commit`` to check the code style & linting.
-   - Run `make deploy-doc-local` to update the documentation
+   - Run ``make deploy-doc-local`` to update the documentation locally and test the website.
    - (optional) Commit Messages: This project uses [Gitmoji](https://gitmoji.dev/) for commit messages. It helps to
      understand the purpose of the commit through emojis. For example, a commit message with a bug fix can be prefixed with
      🐛. There are also [Emojis in GitHub](https://github.com/ikatyang/emoji-cheat-sheet/blob/master/README.md)
    - Manually, merge dev branch into your branch to solve and avoid any conflicts. Merging strategy: merge : dev →
      your_branch
    - After merging, run ``make test`` and ``make pre-commit`` again to ensure that the tests are still passing.
-   - Update the version in ``pyproject.toml`` file 
-   - if your project is a python package, run ``make build-pacakge`` to build the package and create the wheel in the `dist` folder
+   - Update the version in ``pyproject.toml`` file
+   - If your project is a python package, run ``make build-pacakge`` to build the package and create the wheel in the `dist` folder
 3. Run CI/CD Locally: Depending on the platform you use:
    - GitHub Actions: run `make install-act` then `make act` for GitHub Actions
-   - GitLab CI: run `make install-gitlab-ci-local` then `make gitlab-ci-local` for GitLab CI.
 4. Create a pull request. If the GitHub actions pass, the PR will be accepted and merged to dev.
 
 ### 4.5. (For repository maintainers) Merging strategies & GitHub actions guidelines**
