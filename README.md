@@ -40,13 +40,13 @@ It uses LLMs(local or cloud),streamlit (with and without fastapi) & Promptfoo as
 - [x] pre-commit hooks: use ``ruff`` to ensure the code quality & ``detect-secrets`` to scan the secrets in the code.
 - [x] Logging using loguru (with colors)
 - [x] Pytest for unit tests
-- [x] Dockerized project (Dockerfile & docker-compose): for the evaluation pipeline.
+- [x] Dockerized project (Dockerfile & docker-compose).
 - [x] Streamlit (frontend) & FastAPI (backend)
 - [x] Make commands to handle everything for you: install, run, test
 
 **AI tools:**
 
-- [x] LLM running locally (Ollama & Ollamazure) or in the cloud (OpenAI & Azure OpenAI)
+- [x] LLM running locally with Ollama or  in the cloud with any LLM provider (LiteLLM)
 - [x] Information extraction and Question answering from documents
 - [x] Chat to test the AI system
 - [x] Efficient async code using asyncio.
