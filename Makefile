@@ -40,7 +40,7 @@ run-backend:
 	cd src; $(UV) run main_backend.py;
 
 run-app:
-	make frontend backend -j2
+	make run-frontend run-backend -j2
 
 pre-commit-install:
 	@echo "${YELLOW}=========> Installing pre-commit...${NC}"
@@ -103,7 +103,9 @@ install-ollama:
 
 run-ollama:
 	@echo "${YELLOW}Running Ollama...${NC}"
-	@ollama serve
+	@ollama serve &
+	@sleep 5
+	@echo "${GREEN}Ollama server is running in background.${NC}"
 
 download-ollama-model:
 	@echo "${YELLOW}Downloading local model ${OLLAMA_MODEL_NAME} and ${OLLAMA_EMBEDDING_MODEL_NAME}...${NC}"

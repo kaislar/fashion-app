@@ -30,9 +30,9 @@ Click on [<kbd>Use this template</kbd>](https://github.com/aminedjeghri/ai-cloud
 This project is a generative ai template. It contains the following features: LLMs, information extraction, chat, rag & evaluation.
 It uses LLMs(local or cloud),streamlit (with and without fastapi) & Promptfoo as an evaluation and redteam framework for your AI system.
 
-| Evaluation with promptfoo                            | Streamlit                                            |
-|------------------------------------------------------|------------------------------------------------------|
-| <img src="./assets/promptfoo_img.png" width="500" /> | <img src="./assets/streamlit_img.png" width="500" /> |
+| Test embeddings                                       | Test chat                                            |
+|-------------------------------------------------------|------------------------------------------------------|
+| <img src="./assets/embeddings_img.png" width="500" /> | <img src="./assets/streamlit_img.png" width="500" /> |
 
 **Engineering tools:**
 
@@ -143,8 +143,11 @@ Tree:
 
 ### 1.2 ⚙️ Steps for Installation (Users)
 #### App (AI, FastAPI, Streamlit)
-#### Docker (deprecated, will be updated soon, missing the .env and models steps) :
-Run this command : `make docker-compose` then go to [http://localhost:8501](http://localhost:8501)
+You can run the app in a docker container or locally.
+#### Docker:
+- The `docker-compose.yml` file is used to run the app in a docker container. It will install the following services: frontend, backend.
+- Create a ``.env`` file *(You can copy and paste the ``.env.example`` file with `cp .env.example .env`)*
+- Run this command : `make docker-compose` then go to [http://localhost:8501](http://localhost:8501)
 
 #### Local :
 1. To install the app, run `make install-prod`.
@@ -164,59 +167,6 @@ Run this command : `make docker-compose` then go to [http://localhost:8501](http
 4. Run the app:
 - To run the app with Streamlit (and without fastapi), run `make run-frontend`
 - To run the app with both Streamlit and FastAPI, run `make run-app`
-
-#### (optional) Evaluation Tool (AI, Promptfoo, RAGAS)
-
-- To install the evaluation tool, run `make install-promptfoo` (nvm, promptfoo ...),
-- We will use the name `LLMAAJ` to refer to LLM_AS_A_JUDGE, which is used to evaluate the AI system in Ragas metrics and other metrics
-- Update the ``.env`` file *(take a look at the ``.env.example`` file)*
-- To run the app, run `make eval-env-file`
-
-**How to run the evaluations locally:**
-
-- You can run promptfoo with ```make eval-env-file``` to run the evaluation reading the env file. take a look at promptfoo section in the ``.env.example`` file, if you want to use similarity metrics, you need to add the embedding model.
-- Run `test-llmaaj-client` to check if the LLM as a judge responds.
-- If you check the ``make eval-env-file`` command in the makefile, you can see that we do cd src and then set the python path to the current directory so promptfoo can find it.
-- You need to be familiar with Promptfoo to use it. I advise you to learn about it before making changes to the evaluations part of this repository.
-For now, there are different datasets and configs:
-- a simple dataset
-- a dataset for information extraction (NER). IE metrics will be also computed on this dataset.
-- if you want to change a config, go to the makefile and look at the ``eval-env-file`` command. Change the --config evaluation/promptfooconfig.yaml to other configs
-
-Steps to evaluate a rag system:
-
-**retrieval metrics :evaluating retrieved contexts against ground truth**:
-
-1. dataset :
-   - Each row of a dataset has a query and an answer.
-2. steps and metrics:
-   - Evaluate the chunking (chunk_size & chunk_overlap): you will need to check the context_recall & precision for example to see if the answer is in the context.
-   - Evaluate the embeddings: (try different models): same as previous
-   - try retrieval systems like Azure AI Search: same as previous
-
-**end-task: evaluating ground truth vs generated answer**:
-
-1. dataset :
-   - Depending on the end task and the type of the answer (string, or json...), you will need to build the dataset on that.
-   - For example, if the answer is a string, the dataset column 'answer' will be a string.
-   - if you are going to evaluate batch of questions and batch of answers, you will need to build the dataset on that.
-
-2. steps and metrics:
-   - For example, if the answer is a string, you will need to use the exact_match & ragas answer_similarity.
-   - If the answer is a json, you will need to use the json_exact_match, missing_fields...
-   - Changing the prompt
-   - Using one question, or multiple questions (batch) at once sent to the LLM.
-
-3. promptfoo config:
-   - If you use a config like the one in ``src/evaluation/providers/config_baseline.py``, we use an abstract class to define the global structure.
-   - Be aware that you need to adapt it if you want to use it for something else.
-
-## Docker installation (deprecated, will be updated soon)
-
-[//]: # (todo update docker installation for the app and for promptfoo)
-- Set the environment variables (in the system or in a .env file)
-- Run docker with the right port bindings.
-- Since the app is running in docker and using streamlit, the Internal and External URL addresses won't work. You need to access the app with localhost:forwarded_port
 
 ### 1.3 ⚙️ Steps for Installation (Contributors and maintainers)
 Check the [CONTRIBUTING.md](CONTRIBUTING.md) file for more information.
