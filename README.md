@@ -29,9 +29,9 @@ Click on [<kbd>Use this template</kbd>](https://github.com/aminedjeghri/generati
 This project is a generative ai template. It contains the following features: LLMs, information extraction, chat, rag & evaluation.
 It uses LLMs(local or cloud), NiceGUI (frontend) & FastAPI (backend) & Promptfoo as an evaluation and redteam framework for your AI system.
 
-| Test embeddings                                       |
-|-------------------------------------------------------|
-| <img src="./assets/embeddings_img.png" width="500" /> |
+| Test LLM                                            |
+|-----------------------------------------------------|
+| <img src="./assets/frontend_img.png" width="500" /> |
 
 **Engineering tools:**
 
