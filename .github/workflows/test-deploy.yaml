@@ -117,6 +117,7 @@ jobs:
       - name: Install Python dependencies
         shell: bash
         run: |
+          make install-uv
           make install-dev
 
       - name: Deploy Github Pages
