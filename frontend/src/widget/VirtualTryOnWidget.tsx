@@ -408,6 +408,37 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
     }
   }, [apiKey, productId, previewMode, config]);
 
+  // Clean up camera when step changes away from photo
+  useEffect(() => {
+    if (step !== 'photo' && isWebcamActive) {
+      stopWebcam();
+    }
+  }, [step, isWebcamActive]);
+
+  // Clean up camera when component unmounts or modal closes
+  useEffect(() => {
+    return () => {
+      if (isWebcamActive) {
+        stopWebcam();
+      }
+    };
+  }, [isWebcamActive]);
+
+  // Additional cleanup when navigating back from photo to product
+  useEffect(() => {
+    if (step === 'product' && isWebcamActive) {
+      stopWebcam();
+    }
+  }, [step, isWebcamActive]);
+
+  // Handle modal close with camera cleanup
+  const handleClose = () => {
+    if (isWebcamActive) {
+      stopWebcam();
+    }
+    onClose?.();
+  };
+
   // Webcam handling
   const startWebcam = async () => {
     if (!videoRef.current) {
@@ -564,6 +595,9 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
     setError(null);
     setIsGenerating(false);
     webcamStartedRef.current = false;
+    if (isWebcamActive) {
+      stopWebcam();
+    }
     setStep('photo');
   };
 
@@ -594,7 +628,7 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
           </h3>
         </div>
         <button
-          onClick={onClose}
+          onClick={handleClose}
           style={{
             background: 'none',
             border: 'none',
@@ -646,11 +680,7 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
         {!previewMode && (
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              console.log('Close button clicked, onClose function:', onClose);
-              onClose?.();
-            }}
+            onClick={handleClose}
             style={{ ...secondaryButtonStyle, marginBottom: 0, padding: 8, fontSize: 18, borderRadius: 24 }}
           >
             ×
@@ -765,10 +795,7 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
         </div>
         <button
           type="button"
-          onClick={() => {
-            webcamStartedRef.current = false;
-            setStep('product');
-          }}
+          onClick={handleClose}
           style={{ ...secondaryButtonStyle, marginBottom: 0, padding: 8, fontSize: 18, borderRadius: 24 }}
         >
           ×
@@ -884,7 +911,7 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
           </h3>
       </div>
         <button
-          onClick={onClose}
+          onClick={handleClose}
           style={{
             background: 'none',
             border: 'none',
@@ -963,7 +990,7 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
           </h3>
       </div>
         <button
-          onClick={onClose}
+          onClick={handleClose}
           style={{
             background: 'none',
             border: 'none',
@@ -1023,11 +1050,7 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
         </div>
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            console.log('Result close button clicked, onClose function:', onClose);
-            onClose?.();
-          }}
+          onClick={handleClose}
           style={{ ...secondaryButtonStyle, marginBottom: 0, padding: 8, fontSize: 18, borderRadius: 24 }}
         >
           ×
@@ -1044,7 +1067,7 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
           <button type="button" onClick={resetWidget} style={{ ...primaryButtonStyle }}>
             Try Again
           </button>
-          <button type="button" onClick={onClose} style={{ ...secondaryButtonStyle }}>
+          <button type="button" onClick={handleClose} style={{ ...secondaryButtonStyle }}>
             Close
           </button>
         </div>

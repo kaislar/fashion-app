@@ -50,7 +50,14 @@ const Landing: React.FC<{ isLoggedIn: boolean }> = ({ isLoggedIn }) => {
                 <span className={`hamburger ${mobileMenuOpen ? 'open' : ''}`}></span>
               </button>
             </>
-          ) : null}
+          ) : (
+            <>
+              <button className="cta-button" onClick={() => navigate('/dashboard')}>Dashboard</button>
+              <button ref={hamburgerRef} className="mobile-menu-toggle" onClick={toggleMobileMenu}>
+                <span className={`hamburger ${mobileMenuOpen ? 'open' : ''}`}></span>
+              </button>
+            </>
+          )}
         </nav>
       </header>
       <section className="hero">

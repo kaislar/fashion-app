@@ -12,6 +12,7 @@ import DashboardPage from './pages/DashboardPage';
 import ProductsPage from './pages/ProductsPage';
 import WidgetPage from './pages/WidgetPage';
 import IntegrationPage from './pages/IntegrationPage';
+import SubscriptionPage from './pages/SubscriptionPage';
 import Landing from './Landing';
 import DemoStorePage from './pages/DemoStorePage';
 
@@ -62,6 +63,9 @@ const AppContent: React.FC = () => {
         </Route>
         <Route path="/integration" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
           <Route index element={<IntegrationPage />} />
+        </Route>
+        <Route path="/subscription" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
+          <Route index element={<SubscriptionPage />} />
         </Route>
       </Routes>
     </>

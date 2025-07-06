@@ -13,6 +13,7 @@ const navItems = [
   { key: 'products', label: 'Products', icon: '👕', desc: 'Catalogue', section: 'Main', gradient: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' },
   { key: 'widget', label: 'Widget', icon: '🔧', desc: 'Customize', section: 'Settings', gradient: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' },
   { key: 'integration', label: 'Integration', icon: '🔑', desc: 'API & Embed', section: 'Settings', gradient: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)' },
+  { key: 'subscription', label: 'Subscription', icon: '💳', desc: 'Billing & Credits', section: 'Settings', gradient: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)' },
   { key: 'profile', label: 'Profile', icon: '👤', desc: 'Account', section: 'Settings', gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
   { key: 'logout', label: 'Logout', icon: '🚪', desc: 'Sign out', section: 'Settings', gradient: 'linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%)' },
 ];
@@ -24,6 +25,7 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen, onNaviga
     if (location.pathname.startsWith('/products')) return 'products';
     if (location.pathname.startsWith('/widget')) return 'widget';
     if (location.pathname.startsWith('/integration')) return 'integration';
+    if (location.pathname.startsWith('/subscription')) return 'subscription';
     if (location.pathname.startsWith('/profile')) return 'profile';
     return '';
   };
