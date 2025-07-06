@@ -192,3 +192,8 @@ src/evaluation/data/*
 !src/evaluation/data/test_simple.csv
 
 .qodo
+
+api/db.sqlite
+api/__pycache__/
+data
+api/artifacts
