@@ -147,4 +147,4 @@ const Sidebar: React.FC<SidebarProps> = ({ sidebarOpen, setSidebarOpen, onNaviga
   );
 };
 
-export default Sidebar; 
+export default Sidebar;

@@ -58,16 +58,16 @@ export const isImportMethodEnabled = (methodId: string): boolean => {
 export const importConfig = {
   // Maximum file size for CSV uploads (in bytes)
   maxFileSize: 200 * 1024 * 1024, // 200MB
-  
+
   // Supported file formats
   supportedFormats: ['csv', 'xlsx', 'xls'],
-  
+
   // Default scheduling options
   defaultSchedule: 'once',
-  
+
   // Whether to show notifications option
   showNotifications: true,
-  
+
   // Whether to show API configuration for non-CSV methods
   showApiConfig: false
-}; 
+};

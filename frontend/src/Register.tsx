@@ -114,14 +114,14 @@ const Register: React.FC<RegisterProps> = ({ onBack, onGoToLogin, onRegisterSucc
           {/* Login Link */}
           <div style={{ textAlign: 'center', marginTop: 8 }}>
             <span style={{ color: '#aaa', fontSize: 14 }}>Already have an account? </span>
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={onGoToLogin}
-              style={{ 
-                background: 'none', 
-                border: 'none', 
-                color: '#4ecdc4', 
-                cursor: 'pointer', 
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#4ecdc4',
+                cursor: 'pointer',
                 fontSize: 14,
                 fontWeight: 600,
                 textDecoration: 'underline'
@@ -139,4 +139,4 @@ const Register: React.FC<RegisterProps> = ({ onBack, onGoToLogin, onRegisterSucc
   );
 };
 
-export default Register; 
+export default Register;

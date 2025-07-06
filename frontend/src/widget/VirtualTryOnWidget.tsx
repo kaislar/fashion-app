@@ -417,27 +417,27 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
     console.log('Starting webcam...');
     console.log('navigator.mediaDevices available:', !!navigator.mediaDevices);
     console.log('getUserMedia available:', !!navigator.mediaDevices?.getUserMedia);
-    
+
     try {
       // Check if we're in a secure context (HTTPS or localhost)
       if (!window.isSecureContext) {
         throw new Error('Camera access requires a secure context (HTTPS or localhost)');
       }
-      
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
           width: { ideal: 640 },
           height: { ideal: 480 },
           facingMode: 'user'
-        } 
+        }
       });
-      
+
       console.log('Webcam stream obtained:', stream);
       console.log('Stream tracks:', stream.getTracks());
-      
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
-        
+
         // Wait for video to be ready
         videoRef.current.onloadedmetadata = () => {
           console.log('Video metadata loaded, playing video...');
@@ -449,16 +449,16 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
             setError('Video playback failed: ' + playError.message);
           });
         };
-        
+
         videoRef.current.onerror = (e) => {
           console.error('Video error:', e);
           setError('Video playback error');
         };
-        
+
         videoRef.current.oncanplay = () => {
           console.log('Video can play');
         };
-        
+
         videoRef.current.onplaying = () => {
           console.log('Video is playing');
         };
@@ -470,7 +470,7 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
       console.error('Webcam error:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError('Unable to access camera: ' + errorMessage);
-      
+
       // Reset the flag so user can try again
       webcamStartedRef.current = false;
     }
@@ -489,12 +489,12 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
       const video = videoRef.current;
       const canvas = canvasRef.current;
       const context = canvas.getContext('2d');
-      
+
       if (context) {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         context.drawImage(video, 0, 0);
-        
+
         const photoData = canvas.toDataURL('image/jpeg', 0.8);
         setPhoto(photoData);
         stopWebcam();
@@ -523,7 +523,7 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
 
     // Show a tip if waiting more than 5 seconds
     const tipTimeout = setTimeout(() => setShowLongWaitTip(true), 5000);
-    
+
     try {
       const response = await fetch(`${BASE_API_URL}/api/generate-virtual-try-on-image`, {
         method: 'POST',
@@ -644,13 +644,13 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
           </h3>
         </div>
         {!previewMode && (
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               console.log('Close button clicked, onClose function:', onClose);
               onClose?.();
-            }} 
+            }}
             style={{ ...secondaryButtonStyle, marginBottom: 0, padding: 8, fontSize: 18, borderRadius: 24 }}
           >
             ×
@@ -668,8 +668,8 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
           flex: 1
         }}>
           <div style={{ ...styles.productImage, margin: '0 auto' }}>
-            <img 
-              src={product.images[0]} 
+            <img
+              src={product.images[0]}
               alt={product.name}
               style={styles.image}
             />
@@ -689,13 +689,13 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
             Your photo is processed securely and never stored.
           </span>
         </div>
-        <button 
+        <button
           type="button"
           onClick={(e) => {
             e.stopPropagation();
             console.log('Take Photo button clicked, previewMode:', previewMode);
             setStep('photo');
-          }} 
+          }}
           style={{ ...primaryButtonStyle, marginBottom: 12 }}
           disabled={previewMode}
         >
@@ -763,12 +763,12 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
             Take a Photo
           </h3>
         </div>
-        <button 
-          type="button" 
+        <button
+          type="button"
           onClick={() => {
             webcamStartedRef.current = false;
             setStep('product');
-          }} 
+          }}
           style={{ ...secondaryButtonStyle, marginBottom: 0, padding: 8, fontSize: 18, borderRadius: 24 }}
         >
           ×
@@ -810,21 +810,21 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
                 </p>
               </div>
               ) : null}
-            <button 
+            <button
               type="button"
               onClick={() => {
                 console.log('Manual webcam start clicked');
                 webcamStartedRef.current = false;
                 startWebcam();
-              }} 
+              }}
                 style={{ ...primaryButtonStyle }}
               disabled={!window.isSecureContext}
             >
               📷 Start Camera Manually
             </button>
-            <button 
+            <button
               type="button"
-              onClick={() => fileInputRef.current?.click()} 
+              onClick={() => fileInputRef.current?.click()}
                 style={{ ...secondaryButtonStyle }}
             >
               📁 Upload Photo Instead
@@ -911,15 +911,15 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
           </div>
         )}
         <div style={styles.previewActions}>
-          <button 
-            type="button" 
-            onClick={() => setStep('photo')} 
+          <button
+            type="button"
+            onClick={() => setStep('photo')}
             style={{ ...secondaryButtonStyle }}
           >
             ← Take Another Photo
           </button>
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={() => processTryOn(photo!)}
             style={{ ...primaryButtonStyle }}
             disabled={!photo || isGenerating}
@@ -1021,13 +1021,13 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
             Your Try-On Result
           </h3>
         </div>
-        <button 
-          type="button" 
+        <button
+          type="button"
           onClick={(e) => {
             e.stopPropagation();
             console.log('Result close button clicked, onClose function:', onClose);
             onClose?.();
-          }} 
+          }}
           style={{ ...secondaryButtonStyle, marginBottom: 0, padding: 8, fontSize: 18, borderRadius: 24 }}
         >
           ×
@@ -1105,4 +1105,4 @@ function hexToRgba(hex: string, alpha: number) {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
-export default VirtualTryOnWidget; 
+export default VirtualTryOnWidget;

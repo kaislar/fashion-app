@@ -3,4 +3,4 @@ import Products from '../Products';
 
 const ProductsPage: React.FC = () => <Products />;
 
-export default ProductsPage; 
+export default ProductsPage;

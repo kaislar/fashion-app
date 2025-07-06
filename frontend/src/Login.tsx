@@ -98,14 +98,14 @@ const Login: React.FC<LoginProps> = ({ onBack, onGoToRegister, onLoginSuccess })
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
-              style={{ 
-                position: 'absolute', 
-                right: 12, 
-                top: '50%', 
-                transform: 'translateY(-50%)', 
-                background: 'none', 
-                border: 'none', 
-                cursor: 'pointer', 
+              style={{
+                position: 'absolute',
+                right: 12,
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
                 color: '#667eea',
                 padding: 4,
                 display: 'flex',
@@ -138,14 +138,14 @@ const Login: React.FC<LoginProps> = ({ onBack, onGoToRegister, onLoginSuccess })
           {/* Register Link */}
           <div style={{ textAlign: 'center', marginTop: 8 }}>
             <span style={{ color: '#aaa', fontSize: 14 }}>Don't have an account? </span>
-            <button 
-              type="button" 
+            <button
+              type="button"
               onClick={onGoToRegister}
-              style={{ 
-                background: 'none', 
-                border: 'none', 
-                color: '#667eea', 
-                cursor: 'pointer', 
+              style={{
+                background: 'none',
+                border: 'none',
+                color: '#667eea',
+                cursor: 'pointer',
                 fontSize: 14,
                 fontWeight: 600,
                 textDecoration: 'underline'
@@ -164,4 +164,4 @@ const Login: React.FC<LoginProps> = ({ onBack, onGoToRegister, onLoginSuccess })
   );
 };
 
-export default Login; 
+export default Login;

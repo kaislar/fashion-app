@@ -9,11 +9,11 @@ interface AuthenticatedImageProps {
   onClick?: () => void;
 }
 
-const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({ 
-  src, 
-  alt, 
-  style, 
-  onClick 
+const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
+  src,
+  alt,
+  style,
+  onClick
 }) => {
   const { token } = useAuth();
   const [imageUrl, setImageUrl] = useState<string>('');
@@ -30,9 +30,9 @@ const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
       try {
         setLoading(true);
         setError(false);
-        
+
         console.log('Loading image:', src, 'with token:', token ? 'present' : 'missing');
-        
+
         // If it's already a blob URL or data URL, use it directly
         if (src.startsWith('blob:') || src.startsWith('data:')) {
           setImageUrl(src);
@@ -43,7 +43,7 @@ const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
         // If it's a server URL, fetch it with authentication
         // Use the path as-is since backend serves from /artifacts/
         let imagePath = src;
-        
+
         console.log('Fetching image from path:', imagePath);
         const authenticatedUrl = await api.getAuthenticatedImageUrl(imagePath, token);
         setImageUrl(authenticatedUrl);
@@ -67,7 +67,7 @@ const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
 
   if (loading) {
     return (
-      <div 
+      <div
         style={{
           ...style,
           background: 'rgba(255,255,255,0.08)',
@@ -85,7 +85,7 @@ const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
 
   if (error || !imageUrl) {
     return (
-      <div 
+      <div
         style={{
           ...style,
           background: 'rgba(255,255,255,0.08)',
@@ -111,4 +111,4 @@ const AuthenticatedImage: React.FC<AuthenticatedImageProps> = ({
   );
 };
 
-export default AuthenticatedImage; 
+export default AuthenticatedImage;

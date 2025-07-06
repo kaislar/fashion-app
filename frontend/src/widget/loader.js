@@ -114,4 +114,4 @@ window.VirtualTryOnWidget = {
   }
 };
 
-export default VirtualTryOnWidgetLoader; 
+export default VirtualTryOnWidgetLoader;

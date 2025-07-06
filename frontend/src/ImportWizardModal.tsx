@@ -10,22 +10,22 @@ type ImportWizardModalProps = {
   setSelectedMethod: (method: string) => void;
 };
 
-const ImportWizardModal: React.FC<ImportWizardModalProps> = ({ 
-  isOpen, 
-  onClose, 
-  step, 
-  setStep, 
-  selectedMethod, 
-  setSelectedMethod 
+const ImportWizardModal: React.FC<ImportWizardModalProps> = ({
+  isOpen,
+  onClose,
+  step,
+  setStep,
+  selectedMethod,
+  setSelectedMethod
 }) => {
   const importMethods = getEnabledImportMethods();
 
   const renderStep1 = () => (
     <div>
       <h3 style={{ fontWeight: 700, fontSize: 24, marginBottom: 24, textAlign: 'center' }}>Choose Import Method</h3>
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(2, 1fr)', 
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(2, 1fr)',
         gap: 20,
         marginBottom: 32
       }}>
@@ -78,15 +78,15 @@ const ImportWizardModal: React.FC<ImportWizardModalProps> = ({
         ))}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button 
-          className="btn-secondary" 
+        <button
+          className="btn-secondary"
           onClick={onClose}
           style={{ padding: '14px 28px', fontSize: 16, fontWeight: 600 }}
         >
           Cancel
         </button>
-        <button 
-          className="btn-primary" 
+        <button
+          className="btn-primary"
           onClick={() => setStep(2)}
           disabled={!selectedMethod}
           style={{ padding: '14px 28px', fontSize: 16, fontWeight: 600 }}
@@ -104,7 +104,7 @@ const ImportWizardModal: React.FC<ImportWizardModalProps> = ({
         {selectedMethod === 'csv' ? (
           <div>
             <h4 style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>File Upload</h4>
-            
+
             {/* File Format Instructions */}
             <div style={{
               background: 'rgba(255,255,255,0.05)',
@@ -129,7 +129,7 @@ const ImportWizardModal: React.FC<ImportWizardModalProps> = ({
                 </p>
               </div>
             </div>
-            
+
             <div style={{
               border: '2px dashed rgba(255,255,255,0.3)',
               borderRadius: 12,
@@ -209,7 +209,7 @@ const ImportWizardModal: React.FC<ImportWizardModalProps> = ({
             )}
           </div>
         )}
-        
+
         {selectedMethod !== 'csv' && (
           <div style={{ marginTop: 24 }}>
             <h4 style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>Scheduling</h4>
@@ -248,15 +248,15 @@ const ImportWizardModal: React.FC<ImportWizardModalProps> = ({
         )}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button 
-          className="btn-secondary" 
+        <button
+          className="btn-secondary"
           onClick={() => setStep(1)}
           style={{ padding: '12px 24px' }}
         >
           Back
         </button>
-        <button 
-          className="btn-primary" 
+        <button
+          className="btn-primary"
           onClick={() => setStep(3)}
           style={{ padding: '12px 24px' }}
         >
@@ -334,7 +334,7 @@ const ImportWizardModal: React.FC<ImportWizardModalProps> = ({
             </tbody>
           </table>
         </div>
-        
+
         <h4 style={{ fontWeight: 600, fontSize: 16, marginBottom: 16 }}>Field Mapping</h4>
         <div style={{ display: 'grid', gap: 12 }}>
           {/* Required Fields */}
@@ -381,7 +381,7 @@ const ImportWizardModal: React.FC<ImportWizardModalProps> = ({
               <option value="product_id">Product ID</option>
             </select>
           </div>
-          
+
           {/* Optional Fields */}
           <div style={{ marginTop: 16, marginBottom: 8 }}>
             <span style={{ color: '#bfcfff', fontSize: 12, fontWeight: 600 }}>Optional Fields</span>
@@ -470,15 +470,15 @@ const ImportWizardModal: React.FC<ImportWizardModalProps> = ({
         </div>
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button 
-          className="btn-secondary" 
+        <button
+          className="btn-secondary"
           onClick={() => setStep(2)}
           style={{ padding: '12px 24px' }}
         >
           Back
         </button>
-        <button 
-          className="btn-primary" 
+        <button
+          className="btn-primary"
           onClick={() => setStep(4)}
           style={{ padding: '12px 24px' }}
         >
@@ -520,7 +520,7 @@ const ImportWizardModal: React.FC<ImportWizardModalProps> = ({
             </div>
           </div>
         </div>
-        
+
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
           <input
             type="checkbox"
@@ -533,15 +533,15 @@ const ImportWizardModal: React.FC<ImportWizardModalProps> = ({
         </div>
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button 
-          className="btn-secondary" 
+        <button
+          className="btn-secondary"
           onClick={() => setStep(3)}
           style={{ padding: '12px 24px' }}
         >
           Back
         </button>
-        <button 
-          className="btn-primary" 
+        <button
+          className="btn-primary"
           onClick={() => {
             // TODO: Execute import
             onClose();
@@ -585,31 +585,31 @@ const ImportWizardModal: React.FC<ImportWizardModalProps> = ({
         overflow: 'auto',
         position: 'relative',
       }}>
-        <button 
-          onClick={onClose} 
-          style={{ 
-            position: 'absolute', 
-            top: 16, 
-            right: 16, 
-            background: '#ff6b6b', 
-            color: 'white', 
-            border: 'none', 
-            borderRadius: '50%', 
-            width: 32, 
-            height: 32, 
-            cursor: 'pointer', 
-            fontWeight: 700, 
-            fontSize: 18, 
-            boxShadow: '0 2px 6px #0003' 
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            background: '#ff6b6b',
+            color: 'white',
+            border: 'none',
+            borderRadius: '50%',
+            width: 32,
+            height: 32,
+            cursor: 'pointer',
+            fontWeight: 700,
+            fontSize: 18,
+            boxShadow: '0 2px 6px #0003'
           }}
         >
           ×
         </button>
-        
+
         {/* Progress Steps */}
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'center',
           marginBottom: 40,
           gap: 16
         }}>
@@ -634,11 +634,11 @@ const ImportWizardModal: React.FC<ImportWizardModalProps> = ({
             </div>
           ))}
         </div>
-        
+
         {renderCurrentStep()}
       </div>
     </div>
   );
 };
 
-export default ImportWizardModal; 
+export default ImportWizardModal;

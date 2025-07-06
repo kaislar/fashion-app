@@ -113,12 +113,12 @@ const Products: React.FC = () => {
       for (let i = 1; i < lines.length; i++) {
         const [name, sku, price] = lines[i].split(',');
         if (!name || !sku || isNaN(Number(price))) continue;
-        newProducts.push({ 
-          id: Math.random().toString(), 
-          name, 
-          sku, 
-          price: Number(price), 
-          images: [] 
+        newProducts.push({
+          id: Math.random().toString(),
+          name,
+          sku,
+          price: Number(price),
+          images: []
         });
       }
       setProducts(ps => [...ps, ...newProducts]);
@@ -147,8 +147,8 @@ const Products: React.FC = () => {
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', marginBottom: 32 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 9.6 }}>
-              <button 
-                className="btn-secondary" 
+              <button
+                className="btn-secondary"
                 style={{ marginRight: 6.4 }}
                 onClick={() => setImportModalOpen(true)}
               >
@@ -389,7 +389,7 @@ const Products: React.FC = () => {
               </div>
             )}
           </div>
-          
+
           {/* Pagination */}
           {pageCount > 1 && (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 6.4, marginTop: 25.6 }}>
@@ -441,7 +441,7 @@ const Products: React.FC = () => {
           onSave={handleSave}
         />
       )}
-      
+
       {deleteId !== null && (
         <div style={{
           position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
@@ -559,10 +559,10 @@ const ProductModal: React.FC<{
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files) return;
-    
+
     const fileArr = Array.from(files);
     setSelectedFiles(prev => [...prev, ...fileArr]);
-    
+
     // Create preview URLs for selected files
     const newPreviewUrls = fileArr.map(file => URL.createObjectURL(file));
     setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
@@ -644,7 +644,7 @@ const ProductModal: React.FC<{
         gap: 9.6,
       }}>
         <h3 style={{ fontWeight: 700, fontSize: 16, marginBottom: 9.6 }}>{product ? 'Edit Product' : 'Add Product'}</h3>
-        
+
         <input
           type="text"
           placeholder="Product Name *"
@@ -662,7 +662,7 @@ const ProductModal: React.FC<{
             width: '100%',
           }}
         />
-        
+
         <input
           type="text"
           placeholder="SKU * (e.g., tshirt-001)"
@@ -680,7 +680,7 @@ const ProductModal: React.FC<{
             width: '100%',
           }}
         />
-        
+
         <input
           type="number"
           placeholder="Price (optional)"
@@ -698,7 +698,7 @@ const ProductModal: React.FC<{
             width: '100%',
           }}
         />
-        
+
         <input
           type="url"
           placeholder="Product Page URL (optional)"
@@ -716,7 +716,7 @@ const ProductModal: React.FC<{
             width: '100%',
           }}
         />
-        
+
         <input
           type="text"
           placeholder="Category (optional)"
@@ -734,7 +734,7 @@ const ProductModal: React.FC<{
             width: '100%',
           }}
         />
-        
+
         {/* Image upload */}
         <label style={{ fontWeight: 600, fontSize: 12, marginBottom: 3.2, color: '#ff6b6b' }}>Product Images * (Required)</label>
         <input
@@ -773,4 +773,4 @@ const ProductModal: React.FC<{
   );
 };
 
-export default Products; 
+export default Products;

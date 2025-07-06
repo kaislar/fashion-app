@@ -38,7 +38,7 @@ Add this script tag to your product pages:
 <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
 <!-- Load your widget -->
-<script 
+<script
   src="https://your-cdn.com/virtual-tryon-widget.min.js"
   data-api-key="your-api-key"
   data-product-id="PRODUCT_ID">
@@ -52,7 +52,7 @@ Add this script tag to your product pages:
 The widget will automatically initialize when the page loads:
 
 ```html
-<script 
+<script
   src="https://your-cdn.com/virtual-tryon-widget.min.js"
   data-api-key="your-api-key"
   data-product-id="tshirt-001">
@@ -239,4 +239,4 @@ For issues and questions:
 
 ## License
 
-This widget is part of your Virtual Try-On SaaS platform. 
+This widget is part of your Virtual Try-On SaaS platform.

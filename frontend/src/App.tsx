@@ -18,10 +18,10 @@ import DemoStorePage from './pages/DemoStorePage';
 
 const AppContent: React.FC = () => {
   const { isLoggedIn, loading } = useAuth();
-  
+
   // Add debugging
   console.log('AppContent - isLoggedIn:', isLoggedIn, 'loading:', loading);
-  
+
   if (loading) {
     return (
       <div style={{
@@ -37,7 +37,7 @@ const AppContent: React.FC = () => {
       </div>
     );
   }
-  
+
   return (
     <>
       <div className="animated-bg"></div>

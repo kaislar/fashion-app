@@ -10,17 +10,17 @@ const getApiBaseUrl = () => {
 export const API_CONFIG = {
   // Base URL for API endpoints
   BASE_URL: getApiBaseUrl() + '/api',
-  
+
   // API endpoints
   ENDPOINTS: {
     // Auth endpoints
     LOGIN: '/login',
     REGISTER: '/register',
-    
+
     // Product endpoints
     PRODUCTS: '/products',
     ADD_PRODUCT: '/products/add-single',
-    
+
     // Image endpoints
     IMAGES: '/images',
   },
@@ -40,7 +40,7 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}, token
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   };
-  
+
   // Add existing headers from options
   if (options.headers) {
     Object.entries(options.headers).forEach(([key, value]) => {
@@ -49,7 +49,7 @@ export const apiCall = async (endpoint: string, options: RequestInit = {}, token
       }
     });
   }
-  
+
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -65,24 +65,24 @@ export const getAuthenticatedImageUrl = async (imagePath: string, token?: string
   if (!token) {
     throw new Error('Token required to access images');
   }
-  
+
   const url = buildApiUrl(imagePath);
   console.log('Making request to:', url);
-  
+
   const response = await fetch(url, {
     headers: {
       'Authorization': `Bearer ${token}`,
     },
   });
-  
+
   console.log('Response status:', response.status, response.statusText);
-  
+
   if (!response.ok) {
     const errorText = await response.text();
     console.error('Response error:', errorText);
     throw new Error(`Failed to load image: ${response.status} ${response.statusText}`);
   }
-  
+
   const blob = await response.blob();
   return URL.createObjectURL(blob);
 };
@@ -91,24 +91,24 @@ export const getAuthenticatedImageUrl = async (imagePath: string, token?: string
 export const addProductWithImages = async (productData: any, images: File[], token?: string) => {
   const url = buildApiUrl(API_CONFIG.ENDPOINTS.ADD_PRODUCT);
   const formData = new FormData();
-  
+
   // Add product fields
   formData.append('name', productData.name);
   formData.append('sku', productData.sku);
   if (productData.price) formData.append('price', productData.price.toString());
   if (productData.page_url) formData.append('page_url', productData.page_url);
   if (productData.category) formData.append('category', productData.category);
-  
+
   // Add images
   images.forEach((image, index) => {
     formData.append('images', image);
   });
-  
+
   const headers: Record<string, string> = {};
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  
+
   return fetch(url, {
     method: 'POST',
     body: formData,
@@ -121,13 +121,13 @@ export const api = {
   // Product endpoints
   getProducts: (token?: string) => fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.PRODUCTS}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} }),
   addProduct: (formData: FormData, token?: string) => fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ADD_PRODUCT}`, { method: 'POST', body: formData, headers: token ? { Authorization: `Bearer ${token}` } : {} }),
-  addProductWithImages: (productData: any, images: File[], token?: string) => 
+  addProductWithImages: (productData: any, images: File[], token?: string) =>
     addProductWithImages(productData, images, token),
-  
+
   // Image endpoints
-  getAuthenticatedImageUrl: (imagePath: string, token?: string) => 
+  getAuthenticatedImageUrl: (imagePath: string, token?: string) =>
     getAuthenticatedImageUrl(imagePath, token),
-  
+
   // Auth endpoints
   login: (formData: FormData) => fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGIN}`, { method: 'POST', body: formData }),
   register: (body: any) => fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.REGISTER}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
@@ -135,4 +135,4 @@ export const api = {
   saveWidgetConfig: (config: any, token: string) => fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.WIDGET_CONFIG}`, { method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(config) }),
   getWidgetEmbedCode: (token: string) => fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.WIDGET_EMBED_CODE}`, { headers: { Authorization: `Bearer ${token}` } }),
   regenerateApiKey: (token: string) => fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.WIDGET_REGENERATE_API_KEY}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } }),
-}; 
+};

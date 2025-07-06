@@ -1,9 +1,9 @@
 import React from 'react';
 
 const DashboardPage: React.FC = () => (
-  <div style={{ 
-    display: 'flex', 
-    justifyContent: 'center', 
+  <div style={{
+    display: 'flex',
+    justifyContent: 'center',
     alignItems: 'flex-start',
     padding: '32px',
     minHeight: 'calc(100vh - 70px)'
@@ -19,10 +19,10 @@ const DashboardPage: React.FC = () => (
       backdropFilter: 'blur(8px)',
     }}>
       <h2 style={{ fontWeight: 700, fontSize: 32, color: 'white', letterSpacing: 1, marginBottom: 24 }}>Dashboard</h2>
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', 
-        gap: 24 
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+        gap: 24
       }}>
         <div style={{
           background: 'rgba(255,255,255,0.10)',
@@ -56,4 +56,4 @@ const DashboardPage: React.FC = () => (
   </div>
 );
 
-export default DashboardPage; 
+export default DashboardPage;

@@ -22,4 +22,4 @@ export const defaultWidgetConfig: WidgetConfig = {
   animationType: "fade",
   animationSpeed: "normal",
   uploadButtonText: "Upload a Photo"
-}; 
+};

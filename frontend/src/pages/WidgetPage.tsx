@@ -3,4 +3,4 @@ import WidgetCustomization from '../WidgetCustomization';
 
 const WidgetPage: React.FC = () => <WidgetCustomization />;
 
-export default WidgetPage; 
+export default WidgetPage;

@@ -65,16 +65,16 @@ The `importConfig` object controls various import settings:
 export const importConfig = {
   // Maximum file size for CSV uploads (in bytes)
   maxFileSize: 10 * 1024 * 1024, // 10MB
-  
+
   // Supported file formats
   supportedFormats: ['csv', 'xlsx', 'xls'],
-  
+
   // Default scheduling option
   defaultSchedule: 'once',
-  
+
   // Whether to show notifications option
   showNotifications: true,
-  
+
   // Whether to show API configuration for non-CSV methods
   showApiConfig: false
 };
@@ -108,4 +108,4 @@ For different environments (development, staging, production), you can create se
 - `importConfig.staging.ts`
 - `importConfig.prod.ts`
 
-And import the appropriate one based on your environment variables. 
+And import the appropriate one based on your environment variables.

@@ -258,4 +258,4 @@ const Landing: React.FC<{ isLoggedIn: boolean }> = ({ isLoggedIn }) => {
   );
 };
 
-export default Landing; 
+export default Landing;

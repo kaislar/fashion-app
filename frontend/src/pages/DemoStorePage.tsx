@@ -169,22 +169,22 @@ const DemoStorePage: React.FC<{ isLoggedIn?: boolean }> = ({ isLoggedIn = false 
       </div>
 
       {/* Header */}
-      <header style={{ 
-        background: 'rgba(10,10,10,0.65)', 
-        boxShadow: '0 2px 12px rgba(0,0,0,0.08)', 
-        position: 'fixed', 
-        top: 0, 
-        left: 0, 
-        right: 0, 
-        zIndex: 1000 
+      <header style={{
+        background: 'rgba(10,10,10,0.65)',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 1000
       }}>
         <nav className="container">
-          <button 
-            className="logo" 
-            onClick={() => navigate('/')} 
-            style={{ 
-              background: 'none', 
-              border: 'none', 
+          <button
+            className="logo"
+            onClick={() => navigate('/')}
+            style={{
+              background: 'none',
+              border: 'none',
               cursor: 'pointer',
               fontSize: '1.8rem',
               fontWeight: 800,
@@ -200,8 +200,8 @@ const DemoStorePage: React.FC<{ isLoggedIn?: boolean }> = ({ isLoggedIn = false 
             <li><a href="/#pricing">Pricing</a></li>
             <li><a href="/demo-store">Demo Store</a></li>
           </ul>
-          <button 
-            className="cta-button" 
+          <button
+            className="cta-button"
             onClick={() => navigate(isLoggedIn ? '/dashboard' : '/login')}
             style={{
               background: 'linear-gradient(135deg, #ff6b6b 0%, #4ecdc4 100%)',
@@ -366,7 +366,7 @@ const DemoStorePage: React.FC<{ isLoggedIn?: boolean }> = ({ isLoggedIn = false 
                         🛍️
                       </div>
                     )}
-                    
+
                     {/* Try-On Badge */}
                     <div style={{
                       position: 'absolute',
@@ -397,7 +397,7 @@ const DemoStorePage: React.FC<{ isLoggedIn?: boolean }> = ({ isLoggedIn = false 
                     }}>
                       {product.name}
                     </h3>
-                    
+
                     {product.category && (
                       <p style={{
                         fontSize: '0.9rem',
@@ -410,7 +410,7 @@ const DemoStorePage: React.FC<{ isLoggedIn?: boolean }> = ({ isLoggedIn = false 
                         {product.category}
                       </p>
                     )}
-                    
+
                     <p style={{
                       fontSize: '0.8rem',
                       color: 'rgba(255, 255, 255, 0.5)',
@@ -419,7 +419,7 @@ const DemoStorePage: React.FC<{ isLoggedIn?: boolean }> = ({ isLoggedIn = false 
                     }}>
                       SKU: {product.sku}
                     </p>
-                    
+
                     <div style={{
                       fontSize: '1.5rem',
                       fontWeight: '700',
@@ -464,7 +464,7 @@ const DemoStorePage: React.FC<{ isLoggedIn?: boolean }> = ({ isLoggedIn = false 
                     >
                       👕 Try It On
                     </button>
-                    
+
                     {product.page_url && (
                       <button
                         onClick={() => window.open(product.page_url, '_blank')}
@@ -526,4 +526,4 @@ const DemoStorePage: React.FC<{ isLoggedIn?: boolean }> = ({ isLoggedIn = false 
   );
 };
 
-export default DemoStorePage; 
+export default DemoStorePage;

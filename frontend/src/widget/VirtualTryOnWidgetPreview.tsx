@@ -22,4 +22,4 @@ const VirtualTryOnWidgetPreview: React.FC<VirtualTryOnWidgetPreviewProps> = ({
   <VirtualTryOnWidget config={config} previewMode onClose={onClose} />
 );
 
-export default VirtualTryOnWidgetPreview; 
+export default VirtualTryOnWidgetPreview;

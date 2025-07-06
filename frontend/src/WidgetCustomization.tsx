@@ -10,35 +10,35 @@ export interface WidgetConfig {
   secondaryColor: string;
   backgroundColor: string;
   textColor: string;
-  
+
   // Typography
   fontFamily: string;
   fontSize: string;
   fontWeight: string;
-  
+
   // Button styles
   buttonStyle: 'rounded' | 'square' | 'pill';
   buttonSize: 'small' | 'medium' | 'large';
   buttonText: string;
-  
+
   // Layout
   widgetSize: 'small' | 'medium' | 'large';
   position: 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left' | 'center';
-  
+
   // Content
   title: string;
   subtitle: string;
   callToAction: string;
-  
+
   // Features
   showBranding: boolean;
   enableAR: boolean;
   enableSharing: boolean;
-  
+
   // Animation
   animationType: 'fade' | 'slide' | 'bounce' | 'none';
   animationSpeed: 'slow' | 'normal' | 'fast';
-  
+
   // New field
   uploadButtonText: string;
 }
@@ -73,7 +73,7 @@ const WidgetCustomization: React.FC = () => {
     const loadConfig = async () => {
       try {
         const response = await api.getWidgetConfig(token || '');
-        
+
         if (response.ok) {
           const data = await response.json();
           // If config exists and is not empty, use it; otherwise use defaultConfig
@@ -144,10 +144,10 @@ const WidgetCustomization: React.FC = () => {
         boxSizing: 'border-box',
       }}>
         <div style={{ marginBottom: '1.6rem' }}>
-          <h2 style={{ 
-            fontSize: '1.6rem', 
-            fontWeight: 700, 
-            color: 'white', 
+          <h2 style={{
+            fontSize: '1.6rem',
+            fontWeight: 700,
+            color: 'white',
             marginBottom: '0.4rem',
             fontFamily: 'Poppins, Inter, -apple-system, BlinkMacSystemFont, sans-serif'
           }}>
@@ -509,4 +509,4 @@ const WidgetCustomization: React.FC = () => {
   );
 };
 
-export default WidgetCustomization; 
+export default WidgetCustomization;

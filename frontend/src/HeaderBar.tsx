@@ -42,4 +42,4 @@ const HeaderBar: React.FC<HeaderBarProps> = ({ isLoggedIn, onLoginClick, onLogoC
   </header>
 );
 
-export default HeaderBar; 
+export default HeaderBar;

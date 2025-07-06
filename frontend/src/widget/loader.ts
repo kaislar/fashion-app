@@ -33,7 +33,7 @@ class VirtualTryOnWidgetLoader {
       z-index: 2147483647;
       pointer-events: auto;
     `;
-    
+
     return container;
   }
 
@@ -164,7 +164,7 @@ class VirtualTryOnWidgetLoader {
       if (this.container.parentNode) {
         this.container.parentNode.removeChild(this.container);
       }
-      
+
       this.container = null;
     }
   }
@@ -175,13 +175,13 @@ const scriptTag = document.currentScript as HTMLScriptElement;
 if (scriptTag) {
   const apiKey = scriptTag.getAttribute('data-api-key');
   const productId = scriptTag.getAttribute('data-product-id');
-  
+
   if (apiKey && productId) {
     const widget = new VirtualTryOnWidgetLoader({
       apiKey,
       productId
     });
-    
+
     // Auto-initialize after a short delay to ensure DOM is ready
     setTimeout(() => {
       widget.init();
@@ -205,4 +205,4 @@ window.VirtualTryOnWidget = {
   }
 };
 
-export default VirtualTryOnWidgetLoader; 
+export default VirtualTryOnWidgetLoader;
