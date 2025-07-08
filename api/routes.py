@@ -48,13 +48,6 @@ ARTIFACTS_DIR.mkdir(exist_ok=True)
 # In-memory mock invoice storage (replace with DB in production)
 credit_invoices = []
 
-PAYPAL_CLIENT_ID = os.environ.get("PAYPAL_CLIENT_ID")
-PAYPAL_CLIENT_SECRET = os.environ.get("PAYPAL_CLIENT_SECRET")
-PAYPAL_ENV = os.environ.get("PAYPAL_ENV", "sandbox")
-PAYPAL_API_BASE = (
-    "https://api-m.sandbox.paypal.com" if PAYPAL_ENV == "sandbox" else "https://api-m.paypal.com"
-)
-
 STRIPE_SECRET_KEY = os.environ.get("STRIPE_SECRET_KEY")
 FRONT_END_URL = os.environ.get("FRONT_END_URL")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET")
