@@ -192,8 +192,8 @@ src/evaluation/data/*
 !src/evaluation/data/test_simple.csv
 
 .qodo
-frontend/.env.dev
-frontend/.env.prod
+frontend/.env.development
+frontend/.env.production
 api/db.sqlite
 api/__pycache__/
 data

@@ -14,6 +14,8 @@ services:
     networks:
       - localnetwork
       - generic_network
+    env_file:
+      - api/.env.prod
 
   front:
     container_name: fashion_app_front
@@ -25,7 +27,7 @@ services:
       - localnetwork
       - generic_network
     env_file:
-      - frontend/.env.prod
+      - frontend/.env.production
 
   certbot:
     image: certbot/certbot

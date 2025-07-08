@@ -9,7 +9,6 @@ env_file = os.environ.get("ENV_FILE")
 if env_file:
     load_dotenv(env_file)
 
-print("STRIPE_SECRET_KEY:", os.environ.get("STRIPE_SECRET_KEY"))
 app = FastAPI()
 
 # Create artifacts directory if it doesn't exist
@@ -19,7 +18,7 @@ ARTIFACTS_DIR.mkdir(exist_ok=True)
 # CORS middleware (allow frontend dev origin)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
