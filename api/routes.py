@@ -681,8 +681,16 @@ def get_usage_analytics(
         )
         .all()
     )
-    # Get all credit purchases from DB
-    purchases = db.query(CreditPurchaseDB).filter(CreditPurchaseDB.user_id == current_user.id).all()
+    # Get all credit purchases from DB for the selected period
+    purchases = (
+        db.query(CreditPurchaseDB)
+        .filter(
+            CreditPurchaseDB.user_id == current_user.id,
+            CreditPurchaseDB.timestamp >= start,
+            CreditPurchaseDB.timestamp <= end,
+        )
+        .all()
+    )
     # Build period buckets
     usage_history = []
     balance_history = []
@@ -747,6 +755,10 @@ def get_usage_analytics(
     total_credits = int(sum(log.credits_used for log in logs))
     used_this_period = usage_history[-1]["credits"] if usage_history else 0
     avg = int(total_credits / len(usage_history)) if usage_history else 0
+    # Calculate total money spent and total credits purchased for the period
+    total_money = sum(p.amount for p in purchases)
+    total_credits_purchased = sum(p.credits for p in purchases)
+    cost_per_credit = total_money / total_credits_purchased if total_credits_purchased > 0 else 0
     return {
         "currentCredits": current_user.credits,
         "totalCredits": total_credits,
@@ -757,4 +769,7 @@ def get_usage_analytics(
         "start": start.isoformat(),
         "end": end.isoformat(),
         "average": avg,
+        "totalMoney": total_money,
+        "totalCreditsPurchased": total_credits_purchased,
+        "costPerCredit": cost_per_credit,
     }

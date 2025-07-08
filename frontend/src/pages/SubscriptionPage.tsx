@@ -26,6 +26,9 @@ interface UsageData {
   end: string;
   average: number;
   balanceHistory: { date: string; balance: number }[];
+  costPerCredit: number;
+  totalMoney: number;
+  totalCreditsPurchased: number;
 }
 
 type Invoice = {
@@ -64,32 +67,6 @@ const creditPackages: CreditPackage[] = [
     features: ['2000 AI Credits', '24/7 Support', 'Ultra Fast Processing', 'Advanced Analytics', 'Custom Integration']
   }
 ];
-
-const usageData: UsageData = {
-  currentCredits: 342,
-  totalCredits: 500,
-  usedThisPeriod: 158,
-  period: 'monthly',
-  usageHistory: [
-    { date: '2024-01', credits: 120 },
-    { date: '2024-02', credits: 145 },
-    { date: '2024-03', credits: 158 },
-    { date: '2024-04', credits: 132 },
-    { date: '2024-05', credits: 167 },
-    { date: '2024-06', credits: 158 }
-  ],
-  start: '2024-01',
-  end: '2024-06',
-  average: 145,
-  balanceHistory: [
-    { date: '2024-01', balance: 342 },
-    { date: '2024-02', balance: 487 },
-    { date: '2024-03', balance: 645 },
-    { date: '2024-04', balance: 777 },
-    { date: '2024-05', balance: 944 },
-    { date: '2024-06', balance: 1102 }
-  ]
-};
 
 const invoices: Invoice[] = [
   {
@@ -159,53 +136,51 @@ const SubscriptionPage: React.FC = () => {
   const [showAs, setShowAs] = useState<'credits' | 'money'>('credits');
   const [invoicesLoading, setInvoicesLoading] = useState(false);
 
-  // Fetch credits and invoices
+  // Fetch credits for Overview tab
   useEffect(() => {
-    const fetchAllData = async () => {
+    if (activeTab === 'overview' && token) {
       setLoading(true);
       setError(null);
-      try {
-        const safeToken = token || undefined;
-        // 1. Fetch credits first
-        const creditsRes = await apiCall('/credits', { method: 'GET' }, safeToken);
-        if (!creditsRes.ok) {
-          const errText = await creditsRes.text();
-          console.error('Failed to fetch credits:', errText);
-          throw new Error('Failed to fetch credits');
-        }
-        const creditsData = await creditsRes.json();
-        setCredits(creditsData.credits);
-        // 2. Fetch analytics and transactions in parallel, but set invoicesLoading for invoices
-        const params = new URLSearchParams();
-        params.append('period', period);
-        if (startDate) params.append('start_date', startDate);
-        if (endDate) params.append('end_date', endDate);
-        setInvoicesLoading(true);
-        const [usageRes, invoicesRes] = await Promise.all([
-          apiCall(`/usage/analytics?${params.toString()}`, { method: 'GET' }, safeToken),
-          apiCall('/stripe/transactions', { method: 'GET' }, safeToken)
-        ]);
-        if (!usageRes.ok) {
-          const errText = await usageRes.text();
-          throw new Error(errText);
-        }
-        if (!invoicesRes.ok) {
-          const errText = await invoicesRes.text();
-          throw new Error('Failed to fetch invoices');
-        }
-        const usageData = await usageRes.json();
-        setUsageData(usageData);
-        const invoicesData = await invoicesRes.json();
-        setInvoices(invoicesData);
-      } catch (err: any) {
-        setError(err.message || 'Failed to load data');
-      } finally {
-        setLoading(false);
-        setInvoicesLoading(false);
-      }
-    };
-    if (token) fetchAllData();
-  }, [token, period, startDate, endDate]);
+      apiCall('/credits', { method: 'GET' }, token)
+        .then(res => res.ok ? res.json() : Promise.reject(res))
+        .then(data => setCredits(data.credits))
+        .catch(err => setError('Failed to load credits'))
+        .finally(() => setLoading(false));
+    }
+  }, [activeTab, token]);
+
+  // Fetch invoices for Billing tab
+  useEffect(() => {
+    if (activeTab === 'billing' && token) {
+      setInvoicesLoading(true);
+      setError(null);
+      apiCall('/stripe/transactions', { method: 'GET' }, token)
+        .then(res => res.ok ? res.json() : Promise.reject(res))
+        .then(data => setInvoices(data))
+        .catch(err => setError('Failed to load invoices'))
+        .finally(() => setInvoicesLoading(false));
+    }
+  }, [activeTab, token]);
+
+  // Usage Analytics filter state and effect (local to Usage tab)
+  const [analyticsPeriod, setAnalyticsPeriod] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+  const [analyticsStartDate, setAnalyticsStartDate] = useState<string>(formatDate(start));
+  const [analyticsEndDate, setAnalyticsEndDate] = useState<string>(formatDate(end));
+  useEffect(() => {
+    if (activeTab === 'usage' && token) {
+      setUsageLoading(true);
+      setUsageError(null);
+      const params = new URLSearchParams();
+      params.append('period', analyticsPeriod);
+      if (analyticsStartDate) params.append('start_date', analyticsStartDate);
+      if (analyticsEndDate) params.append('end_date', analyticsEndDate);
+      apiCall(`/usage/analytics?${params.toString()}`, { method: 'GET' }, token)
+        .then(res => res.ok ? res.json() : Promise.reject(res))
+        .then(data => setUsageData(data))
+        .catch(err => setUsageError('Failed to load usage analytics'))
+        .finally(() => setUsageLoading(false));
+    }
+  }, [activeTab, token, analyticsPeriod, analyticsStartDate, analyticsEndDate]);
 
   useEffect(() => {
     // Show modal if status param is present
@@ -303,22 +278,10 @@ const SubscriptionPage: React.FC = () => {
     }
   };
 
-  // Helper to extract credits from invoice description (e.g., 'Professional Plan - 500 Credits')
-  function extractCreditsFromDescription(description: string): number | null {
-    const match = description.match(/(\d+)\s*Credits?/i);
-    return match ? parseInt(match[1], 10) : null;
-  }
-
-  // Calculate costPerCredit for the selected period (move this above the return statement in SubscriptionPage)
-  const periodStart = startDate;
-  const periodEnd = endDate;
-  const periodPurchases = invoices.filter(inv => inv.date >= periodStart && inv.date < periodEnd);
-  const totalMoney = periodPurchases.reduce((sum, p) => sum + (p.amount || 0), 0);
-  const totalCredits = periodPurchases.reduce((sum, p) => {
-    const credits = extractCreditsFromDescription(p.description || '') || (p.amount ? Math.round(p.amount) : 0);
-    return sum + credits;
-  }, 0);
-  const costPerCredit = totalCredits > 0 ? totalMoney / totalCredits : 0;
+  // Use backend values from usageData
+  const costPerCredit = usageData?.costPerCredit || 0;
+  const totalMoney = usageData?.totalMoney || 0;
+  const totalCreditsPurchased = usageData?.totalCreditsPurchased || 0;
 
   return (
     <div style={{
@@ -788,8 +751,8 @@ const SubscriptionPage: React.FC = () => {
                     <label htmlFor="period-select" style={{ color: 'white', fontWeight: 500, marginRight: 6 }}>Period:</label>
                     <select
                       id="period-select"
-                      value={period}
-                      onChange={e => { setPeriod(e.target.value as any); fetchUsageData(e.target.value as any, startDate, endDate); }}
+                      value={analyticsPeriod}
+                      onChange={e => { setAnalyticsPeriod(e.target.value as any); }}
                       style={{
                         padding: '7px 18px',
                         borderRadius: 10,
@@ -818,8 +781,8 @@ const SubscriptionPage: React.FC = () => {
                     <input
                       id="start-date"
                       type="date"
-                      value={startDate}
-                      onChange={e => { setStartDate(e.target.value); fetchUsageData(period, e.target.value, endDate); }}
+                      value={analyticsStartDate}
+                      onChange={e => { setAnalyticsStartDate(e.target.value); }}
                       style={{
                         padding: '7px 18px',
                         borderRadius: 10,
@@ -844,8 +807,8 @@ const SubscriptionPage: React.FC = () => {
                     <input
                       id="end-date"
                       type="date"
-                      value={endDate}
-                      onChange={e => { setEndDate(e.target.value); fetchUsageData(period, startDate, e.target.value); }}
+                      value={analyticsEndDate}
+                      onChange={e => { setAnalyticsEndDate(e.target.value); }}
                       style={{
                         padding: '7px 18px',
                         borderRadius: 10,
@@ -883,8 +846,8 @@ const SubscriptionPage: React.FC = () => {
                         </div>
                         <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>
                           {showAs === 'credits'
-                            ? `credits in a ${period} period`
-                            : `money spent in a ${period} period`}
+                            ? `credits in a ${analyticsPeriod} period`
+                            : `money spent in a ${analyticsPeriod} period`}
                         </div>
                       </div>
                       {/* Average Card */}
@@ -897,8 +860,8 @@ const SubscriptionPage: React.FC = () => {
                         </div>
                         <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>
                           {showAs === 'credits'
-                            ? `credits per ${period} period`
-                            : `money spent per ${period} period`}
+                            ? `credits per ${analyticsPeriod} period`
+                            : `money spent per ${analyticsPeriod} period`}
                         </div>
                       </div>
                       {/* Total Used Card */}
@@ -927,12 +890,12 @@ const SubscriptionPage: React.FC = () => {
                       width: '100%',
                       position: 'relative',
                     }}>
-                      <div style={{ fontWeight: 600, fontSize: 18, color: 'white', marginBottom: 8 }}>Credit Usage per {period.charAt(0).toUpperCase() + period.slice(1)}</div>
+                      <div style={{ fontWeight: 600, fontSize: 18, color: 'white', marginBottom: 8 }}>Credit Usage per {analyticsPeriod.charAt(0).toUpperCase() + analyticsPeriod.slice(1)}</div>
                       <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginBottom: 24 }}>The bars below show the number of credits consumed in each period for your account.</div>
                       {/* Before rendering UsageBarChart, calculate costPerCredit for the period */}
                       <UsageBarChart
                         usageHistory={usageData.usageHistory}
-                        period={period}
+                        period={analyticsPeriod}
                         height={320}
                         accentGradient={["#4ecdc4", "#44a08d"]}
                         showAs={showAs}
