@@ -80,8 +80,6 @@ services:
   front:
     build:
       context: ./frontend
-      #args:
-      #  BACK_API_URL: http://localhost:8000
     working_dir: /app
     command: sh -c "npm install && npm run build && npx serve -s build -l 3000"
     ports:
