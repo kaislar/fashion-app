@@ -40,8 +40,7 @@ repos:
         -   id: detect-secrets
             args: [
                 '--exclude-files',
-                'notebook.ipynb|frontend/src/pages/DemoStorePage.tsx|frontend/widget-demo.html'
-            ]
+                'notebook.ipynb|frontend/src/pages/DemoStorePage.tsx|frontend/src/widget/README.md|frontend/widget-demo.html']
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v1.2.0
     hooks:
