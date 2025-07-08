@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from database import UserDB, SessionLocal
 
-SECRET_KEY = os.environ.get("FAST_API_SECRET_KEY", "your-secret-key")
+SECRET_KEY = os.environ.get("FAST_API_SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
