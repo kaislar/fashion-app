@@ -10,7 +10,7 @@ dependencies = [
 
 ############### uv configuration
 [tool.uv.workspace]
-members = ["frontend", "backend",]
+members = ["backend"]
 
 # uses also the depenencies in the [project.dependencies] section
 [tool.uv]
