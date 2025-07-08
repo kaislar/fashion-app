@@ -39,7 +39,7 @@ const IntegrationPage: React.FC = () => {
   };
 
   // Embed code with only API key and product ID placeholder
-  const embedCode = `<script src="https://cdn.virtualfit.com/widget.js"></script>\n<script>\n  VirtualFit.init({\n    apiKey: '${apiKey}',\n    productId: 'YOUR_PRODUCT_ID'\n  });\n</script>`;
+  const embedCode = `<script src="https://cdn.virtualfit.com/widget.js"></script>\n<script>\n  VirtualTryOnWidget.init({\n    apiKey: '${apiKey}',\n    productId: 'YOUR_PRODUCT_ID'\n  });\n</script>`;
 
   return (
     <div style={{

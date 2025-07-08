@@ -197,3 +197,5 @@ api/db.sqlite
 api/__pycache__/
 data
 api/artifacts
+api/.env.prod
+api/.env.dev

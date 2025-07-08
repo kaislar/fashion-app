@@ -559,8 +559,8 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
       const response = await fetch(`${BASE_API_URL}/api/generate-virtual-try-on-image`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          ...(apiKey ? { 'X-API-Key': apiKey } : {}),
         },
         body: JSON.stringify({
           productId,

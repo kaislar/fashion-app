@@ -70,7 +70,7 @@ services:
     command: uv run uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     volumes:
       - ./data/artifacts:/app/artifacts
-      - ./data/db.sqlite:/app/db.sqlite 
+      - ./data/db.sqlite:/app/db.sqlite
 
     ports:
       - "8000:8000"
@@ -86,7 +86,6 @@ services:
     command: sh -c "npm install && npm run build && npx serve -s build -l 3000"
     ports:
       - "3000:3000"
-
 networks:
   localnetwork:
     driver: bridge

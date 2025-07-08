@@ -2,19 +2,24 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes import router
 from pathlib import Path
+import os
+from dotenv import load_dotenv
 
+env_file = os.environ.get("ENV_FILE")
+if env_file:
+    load_dotenv(env_file)
+
+print("STRIPE_SECRET_KEY:", os.environ.get("STRIPE_SECRET_KEY"))
 app = FastAPI()
 
 # Create artifacts directory if it doesn't exist
 ARTIFACTS_DIR = Path("artifacts")
 ARTIFACTS_DIR.mkdir(exist_ok=True)
 
-
-
-# CORS middleware
+# CORS middleware (allow frontend dev origin)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -25,4 +30,5 @@ app.include_router(router)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True) 
+
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

@@ -2,7 +2,6 @@ import React, { useState, useMemo } from 'react';
 import ImportWizardModal from './ImportWizardModal';
 import { api, API_CONFIG } from './config/apiConfig';
 import { useAuth } from './AuthContext';
-import AuthenticatedImage from './AuthenticatedImage';
 
 // Product type
 type Product = {
@@ -261,11 +260,15 @@ const Products: React.FC = () => {
                       <tr key={product.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', fontSize: 12.8 }}>
                         <td style={{ padding: '12.8px 9.6px' }}>
                           {product.images && product.images.length > 0 ? (
-                            <AuthenticatedImage
-                              src={product.images[0]}
+                            <img
+                              src={`${API_CONFIG.BASE_URL}${product.images[0]}`}
                               alt="thumb"
                               style={{ width: 44.8, height: 44.8, objectFit: 'cover', borderRadius: 6.4, border: '1.2px solid #fff', cursor: 'pointer' }}
-                              onClick={() => { setGalleryImages(product.images); setGalleryIndex(0); setGalleryOpen(true); }}
+                              onClick={() => {
+                                setGalleryImages(product.images.map(img => `${API_CONFIG.BASE_URL}${img}`));
+                                setGalleryIndex(0);
+                                setGalleryOpen(true);
+                              }}
                             />
                           ) : (
                             <div style={{ width: 44.8, height: 44.8, borderRadius: 6.4, background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bfcfff', fontSize: 19.2, fontWeight: 700 }}>?</div>
@@ -334,11 +337,15 @@ const Products: React.FC = () => {
                   }}>
                     <div style={{ marginBottom: 12.8 }}>
                       {product.images && product.images.length > 0 ? (
-                        <AuthenticatedImage
-                          src={product.images[0]}
+                        <img
+                          src={`${API_CONFIG.BASE_URL}/images/${product.images[0]}`}
                           alt={product.name}
                           style={{ width: '100%', height: 160, objectFit: 'cover', borderRadius: 12.8, border: '1.2px solid #fff', cursor: 'pointer' }}
-                          onClick={() => { setGalleryImages(product.images); setGalleryIndex(0); setGalleryOpen(true); }}
+                          onClick={() => {
+                            setGalleryImages(product.images.map(img => `${API_CONFIG.BASE_URL}${img}`));
+                            setGalleryIndex(0);
+                            setGalleryOpen(true);
+                          }}
                         />
                       ) : (
                         <div style={{ width: '100%', height: 160, borderRadius: 12.8, background: 'rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#bfcfff', fontSize: 38.4, fontWeight: 700 }}>?</div>
@@ -483,7 +490,7 @@ const Products: React.FC = () => {
           </button>
           {galleryImages.length > 0 && (
             <>
-              <AuthenticatedImage
+              <img
                 src={galleryImages[galleryIndex]}
                 alt="gallery"
                 style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain' }}
@@ -553,6 +560,7 @@ const ProductModal: React.FC<{
   const [page_url, setPageUrl] = useState(product?.page_url || '');
   const [category, setCategory] = useState(product?.category || '');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  // Always use product.images (URLs) for initial preview in edit mode
   const [previewUrls, setPreviewUrls] = useState<string[]>(product?.images || []);
   const [error, setError] = useState('');
 
@@ -563,7 +571,7 @@ const ProductModal: React.FC<{
     const fileArr = Array.from(files);
     setSelectedFiles(prev => [...prev, ...fileArr]);
 
-    // Create preview URLs for selected files
+    // Create preview URLs for selected files (blobs)
     const newPreviewUrls = fileArr.map(file => URL.createObjectURL(file));
     setPreviewUrls(prev => [...prev, ...newPreviewUrls]);
   };
@@ -623,6 +631,10 @@ const ProductModal: React.FC<{
       alert(product ? 'Network error. Could not update product.' : 'Network error. Could not add product.');
     }
   };
+
+  const API_BASE = process.env.REACT_APP_BACK_API_URL || '';
+  const getImageUrl = (url: string) =>
+    url.startsWith('http') ? url : `${API_BASE}/api${url}`;
 
   return (
     <div style={{
@@ -758,7 +770,7 @@ const ProductModal: React.FC<{
           {previewUrls.length === 0 && <span style={{ color: '#bfcfff', fontSize: 10.4 }}>No images selected.</span>}
           {previewUrls.map((url, idx) => (
             <div key={idx} style={{ position: 'relative' }}>
-              <AuthenticatedImage src={url} alt="preview" style={{ width: 38.4, height: 38.4, objectFit: 'cover', borderRadius: 6.4, border: '1.2px solid #fff' }} />
+              <img src={getImageUrl(url)} alt="preview" style={{ width: 38.4, height: 38.4, objectFit: 'cover', borderRadius: 6.4, border: '1.2px solid #fff' }} />
               <button type="button" onClick={() => handleRemoveImage(idx)} style={{ position: 'absolute', top: -4.8, right: -4.8, background: '#ff6b6b', color: 'white', border: 'none', borderRadius: '50%', width: 14.4, height: 14.4, cursor: 'pointer', fontWeight: 700, fontSize: 9.6, boxShadow: '0 1.6px 4.8px #0003' }}>×</button>
             </div>
           ))}

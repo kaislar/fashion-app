@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../config/apiConfig';
+import DemoGuideChatbot from '../components/DemoGuideChatbot';
 
 // Widget types are now defined in types/widget.d.ts
 
@@ -13,6 +14,55 @@ interface Product {
   category?: string;
   images: string[];
 }
+
+interface ChatMessage {
+  id: string;
+  type: 'bot' | 'user';
+  content: string;
+  timestamp: Date;
+}
+
+interface GuideStep {
+  id: string;
+  title: string;
+  message: string;
+  action?: string;
+  highlight?: string;
+}
+
+// Guide steps for the demo store
+const guideSteps: GuideStep[] = [
+  {
+    id: 'welcome',
+    title: 'Welcome to the Demo Store! 👋',
+    message: 'Hi! I\'m your AI shopping assistant. Let me show you around our virtual try-on demo store. You can explore products and see how our AI technology works!',
+    action: 'Let\'s start exploring!'
+  },
+  {
+    id: 'products',
+    title: 'Browse Our Products 🛍️',
+    message: 'Here you can see all our demo products. Each product has a "Try It On" button that will open our AI-powered virtual try-on widget.',
+    action: 'Try clicking on a product!'
+  },
+  {
+    id: 'try-on',
+    title: 'Virtual Try-On Experience ✨',
+    message: 'When you click "Try It On", our AI widget will open. You can take a photo or upload one, and our AI will show you how the product looks on you!',
+    action: 'Click "Try It On" on any product'
+  },
+  {
+    id: 'widget-features',
+    title: 'Widget Features 🎯',
+    message: 'The widget includes: camera capture, photo upload, AI processing, and realistic try-on results. It\'s designed to be easy and fun to use!',
+    action: 'Experience it yourself!'
+  },
+  {
+    id: 'integration',
+    title: 'Easy Integration 🔧',
+    message: 'This same widget can be easily integrated into any e-commerce website with just a few lines of code. No complex setup required!',
+    action: 'Ready to try it?'
+  }
+];
 
 const getApiBaseUrl = () => {
   const url = process.env.REACT_APP_BACK_API_URL;
@@ -28,6 +78,65 @@ const DemoStorePage: React.FC<{ isLoggedIn?: boolean }> = ({ isLoggedIn = false 
   const [apiKey, setApiKey] = useState<string | null>('vf_3a596216_d75b4c42117b4a22'); // Fake API key
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showWidget, setShowWidget] = useState(false);
+
+  // Chatbot state
+  const [showChatbot, setShowChatbot] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [currentStep, setCurrentStep] = useState(0);
+  const [chatbotMinimized, setChatbotMinimized] = useState(true);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom of chat
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Initialize chatbot with welcome message
+  useEffect(() => {
+    if (showChatbot && messages.length === 0) {
+      const welcomeStep = guideSteps[0];
+      setMessages([{
+        id: '1',
+        type: 'bot',
+        content: welcomeStep.message,
+        timestamp: new Date()
+      }]);
+    }
+  }, [showChatbot]);
+
+  // Handle next step in guide
+  const handleNextStep = () => {
+    if (currentStep < guideSteps.length - 1) {
+      const nextStep = currentStep + 1;
+      setCurrentStep(nextStep);
+      const step = guideSteps[nextStep];
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        type: 'bot',
+        content: step.message,
+        timestamp: new Date()
+      }]);
+    }
+  };
+
+  // Handle user response
+  const handleUserResponse = (response: string) => {
+    setMessages(prev => [...prev, {
+      id: Date.now().toString(),
+      type: 'user',
+      content: response,
+      timestamp: new Date()
+    }]);
+
+    // Auto-advance to next step after a short delay
+    setTimeout(() => {
+      handleNextStep();
+    }, 1000);
+  };
 
   // Load widget script
   useEffect(() => {
@@ -76,6 +185,11 @@ const DemoStorePage: React.FC<{ isLoggedIn?: boolean }> = ({ isLoggedIn = false 
   const openTryOn = (product: Product) => {
     setSelectedProduct(product);
     setShowWidget(true);
+
+    // Trigger chatbot message for product try-on
+    if ((window as any).handleProductTryOn) {
+      (window as any).handleProductTryOn(product.name);
+    }
   };
 
   const closeWidget = () => {
@@ -271,8 +385,6 @@ const DemoStorePage: React.FC<{ isLoggedIn?: boolean }> = ({ isLoggedIn = false 
               Try on any product before you buy with our revolutionary virtual try-on technology
             </p>
           </div>
-
-
         </div>
 
         {/* Products Grid */}
@@ -521,6 +633,8 @@ const DemoStorePage: React.FC<{ isLoggedIn?: boolean }> = ({ isLoggedIn = false 
         </div>
       </div>
 
+      {/* Floating Chatbot */}
+      <DemoGuideChatbot />
 
     </>
   );

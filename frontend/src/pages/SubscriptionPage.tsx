@@ -1,4 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
+import type { FC, JSX } from 'react';
+import { apiCall, buildApiUrl } from '../config/apiConfig';
+import { useAuth } from '../AuthContext';
+import { loadStripe } from '@stripe/stripe-js';
+import { useLocation } from 'react-router-dom';
 
 // Mock data types
 interface CreditPackage {
@@ -14,25 +19,25 @@ interface CreditPackage {
 interface UsageData {
   currentCredits: number;
   totalCredits: number;
-  usedThisMonth: number;
-  monthlyAverage: number;
-  usageHistory: {
-    date: string;
-    credits: number;
-  }[];
+  usedThisPeriod: number;
+  period: string;
+  usageHistory: { date: string; credits: number }[];
+  start: string;
+  end: string;
+  average: number;
+  balanceHistory: { date: string; balance: number }[];
 }
 
-interface Invoice {
+type Invoice = {
   id: string;
   date: string;
   amount: number;
-  status: 'paid' | 'pending' | 'failed';
   description: string;
-  credits: number;
   downloadUrl?: string;
-}
+};
 
-// Mock data
+const API_BASE = process.env.REACT_APP_BACK_API_URL || '';
+
 const creditPackages: CreditPackage[] = [
   {
     id: 'starter',
@@ -63,8 +68,8 @@ const creditPackages: CreditPackage[] = [
 const usageData: UsageData = {
   currentCredits: 342,
   totalCredits: 500,
-  usedThisMonth: 158,
-  monthlyAverage: 145,
+  usedThisPeriod: 158,
+  period: 'monthly',
   usageHistory: [
     { date: '2024-01', credits: 120 },
     { date: '2024-02', credits: 145 },
@@ -72,6 +77,17 @@ const usageData: UsageData = {
     { date: '2024-04', credits: 132 },
     { date: '2024-05', credits: 167 },
     { date: '2024-06', credits: 158 }
+  ],
+  start: '2024-01',
+  end: '2024-06',
+  average: 145,
+  balanceHistory: [
+    { date: '2024-01', balance: 342 },
+    { date: '2024-02', balance: 487 },
+    { date: '2024-03', balance: 645 },
+    { date: '2024-04', balance: 777 },
+    { date: '2024-05', balance: 944 },
+    { date: '2024-06', balance: 1102 }
   ]
 };
 
@@ -80,48 +96,193 @@ const invoices: Invoice[] = [
     id: 'INV-2024-001',
     date: '2024-06-15',
     amount: 99.00,
-    status: 'paid',
     description: 'Professional Plan - 500 Credits',
-    credits: 500,
     downloadUrl: '#'
   },
   {
     id: 'INV-2024-002',
     date: '2024-05-15',
     amount: 99.00,
-    status: 'paid',
     description: 'Professional Plan - 500 Credits',
-    credits: 500,
     downloadUrl: '#'
   },
   {
     id: 'INV-2024-003',
     date: '2024-04-15',
     amount: 99.00,
-    status: 'paid',
     description: 'Professional Plan - 500 Credits',
-    credits: 500,
     downloadUrl: '#'
   },
   {
     id: 'INV-2024-004',
     date: '2024-03-15',
     amount: 29.00,
-    status: 'paid',
     description: 'Starter Plan - 100 Credits',
-    credits: 100,
     downloadUrl: '#'
   }
 ];
 
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY!);
+
 const SubscriptionPage: React.FC = () => {
+  const { token } = useAuth();
+  const location = useLocation();
   const [selectedPackage, setSelectedPackage] = useState<string>('pro');
   const [activeTab, setActiveTab] = useState<'overview' | 'billing' | 'usage'>('overview');
+  const [credits, setCredits] = useState<number | null>(null);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [buying, setBuying] = useState(false);
+  const [buyError, setBuyError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [modalStatus, setModalStatus] = useState<string | null>(null);
+  const [showModal, setShowModal] = useState(false);
+  const [usageData, setUsageData] = useState<UsageData | null>(null);
+  const [usageLoading, setUsageLoading] = useState(false);
+  const [usageError, setUsageError] = useState<string | null>(null);
+  // Default to weekly for the last 3 months
+  const today = new Date();
+  const dayOfWeek = today.getDay() === 0 ? 6 : today.getDay() - 1; // Monday=0, Sunday=6
+  const end = new Date(today);
+  end.setDate(end.getDate() + 1); // Set end date to tomorrow by default
+  const start = new Date(today);
+  start.setMonth(start.getMonth() - 1);
+  // Move start to the Monday of that week
+  const startDayOfWeek = start.getDay() === 0 ? 6 : start.getDay() - 1;
+  start.setDate(start.getDate() - startDayOfWeek);
+  const formatDate = (d: Date) => d.toISOString().slice(0, 10);
+  const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
+  const [startDate, setStartDate] = useState<string>(formatDate(start));
+  const [endDate, setEndDate] = useState<string>(formatDate(end));
+  // In SubscriptionPage component, add state for toggle
+  const [showAs, setShowAs] = useState<'credits' | 'money'>('credits');
+  const [invoicesLoading, setInvoicesLoading] = useState(false);
 
-  const handlePurchase = (packageId: string) => {
-    console.log('Purchasing package:', packageId);
-    // Mock purchase flow
-    alert('Redirecting to payment processor...');
+  // Fetch credits and invoices
+  useEffect(() => {
+    const fetchAllData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const safeToken = token || undefined;
+        // 1. Fetch credits first
+        const creditsRes = await apiCall('/credits', { method: 'GET' }, safeToken);
+        if (!creditsRes.ok) {
+          const errText = await creditsRes.text();
+          console.error('Failed to fetch credits:', errText);
+          throw new Error('Failed to fetch credits');
+        }
+        const creditsData = await creditsRes.json();
+        setCredits(creditsData.credits);
+        // 2. Fetch analytics and transactions in parallel, but set invoicesLoading for invoices
+        const params = new URLSearchParams();
+        params.append('period', period);
+        if (startDate) params.append('start_date', startDate);
+        if (endDate) params.append('end_date', endDate);
+        setInvoicesLoading(true);
+        const [usageRes, invoicesRes] = await Promise.all([
+          apiCall(`/usage/analytics?${params.toString()}`, { method: 'GET' }, safeToken),
+          apiCall('/stripe/transactions', { method: 'GET' }, safeToken)
+        ]);
+        if (!usageRes.ok) {
+          const errText = await usageRes.text();
+          throw new Error(errText);
+        }
+        if (!invoicesRes.ok) {
+          const errText = await invoicesRes.text();
+          throw new Error('Failed to fetch invoices');
+        }
+        const usageData = await usageRes.json();
+        setUsageData(usageData);
+        const invoicesData = await invoicesRes.json();
+        setInvoices(invoicesData);
+      } catch (err: any) {
+        setError(err.message || 'Failed to load data');
+      } finally {
+        setLoading(false);
+        setInvoicesLoading(false);
+      }
+    };
+    if (token) fetchAllData();
+  }, [token, period, startDate, endDate]);
+
+  useEffect(() => {
+    // Show modal if status param is present
+    const params = new URLSearchParams(location.search);
+    const status = params.get('status');
+    if (status === 'success' || status === 'cancel' || status === 'failed') {
+      setModalStatus(status);
+      setShowModal(true);
+    }
+  }, [location.search, token]);
+
+  useEffect(() => {
+    if (showModal) {
+      const timer = setTimeout(() => setShowModal(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [showModal]);
+
+  const fetchUsageData = async (selectedPeriod = period, sDate = startDate, eDate = endDate) => {
+    setUsageLoading(true);
+    setUsageError(null);
+    try {
+      const params = new URLSearchParams();
+      params.append('period', selectedPeriod);
+      if (sDate) params.append('start_date', sDate);
+      if (eDate) params.append('end_date', eDate);
+      const safeToken = token || undefined;
+      const res = await apiCall(`/usage/analytics?${params.toString()}`, { method: 'GET' }, safeToken);
+      if (!res.ok) {
+        const errText = await res.text();
+        throw new Error(errText);
+      }
+      const data = await res.json();
+      setUsageData(data);
+    } catch (err: any) {
+      setUsageError(err.message || 'Failed to load usage analytics');
+    } finally {
+      setUsageLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (token) fetchUsageData();
+    // eslint-disable-next-line
+  }, [token]);
+
+  const handleStripePurchase = async (pkg: CreditPackage) => {
+    setBuying(true);
+    setBuyError(null);
+    setSuccessMsg(null);
+    try {
+      const safeToken = token || undefined;
+      const res = await apiCall('/stripe/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: pkg.price,
+          credits: pkg.credits
+        })
+      }, safeToken);
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error('Failed to create Stripe session:', errText);
+        throw new Error('Failed to create Stripe session');
+      }
+      const data = await res.json();
+      const stripe = await stripePromise;
+      if (stripe && data.checkout_url) {
+        window.location.href = data.checkout_url;
+      } else {
+        throw new Error('Stripe not loaded or checkout_url missing');
+      }
+    } catch (err: any) {
+      setBuyError(err.message || 'Failed to start Stripe checkout');
+    } finally {
+      setBuying(false);
+    }
   };
 
   const getStatusColor = (status: string) => {
@@ -142,6 +303,23 @@ const SubscriptionPage: React.FC = () => {
     }
   };
 
+  // Helper to extract credits from invoice description (e.g., 'Professional Plan - 500 Credits')
+  function extractCreditsFromDescription(description: string): number | null {
+    const match = description.match(/(\d+)\s*Credits?/i);
+    return match ? parseInt(match[1], 10) : null;
+  }
+
+  // Calculate costPerCredit for the selected period (move this above the return statement in SubscriptionPage)
+  const periodStart = startDate;
+  const periodEnd = endDate;
+  const periodPurchases = invoices.filter(inv => inv.date >= periodStart && inv.date < periodEnd);
+  const totalMoney = periodPurchases.reduce((sum, p) => sum + (p.amount || 0), 0);
+  const totalCredits = periodPurchases.reduce((sum, p) => {
+    const credits = extractCreditsFromDescription(p.description || '') || (p.amount ? Math.round(p.amount) : 0);
+    return sum + credits;
+  }, 0);
+  const costPerCredit = totalCredits > 0 ? totalMoney / totalCredits : 0;
+
   return (
     <div style={{
       display: 'flex',
@@ -159,413 +337,913 @@ const SubscriptionPage: React.FC = () => {
         border: '1.5px solid rgba(255,255,255,0.18)',
         boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
         backdropFilter: 'blur(8px)',
+        position: 'relative'
       }}>
-        <h2 style={{ fontWeight: 700, fontSize: 32, color: 'white', letterSpacing: 1, marginBottom: 24 }}>
-          Subscription & Billing
-        </h2>
-
-        {/* Tab Navigation */}
-        <div style={{
-          display: 'flex',
-          gap: 8,
-          marginBottom: 32,
-          borderBottom: '1px solid rgba(255,255,255,0.1)',
-          paddingBottom: 16
-        }}>
-          {[
-            { id: 'overview', label: 'Overview' },
-            { id: 'billing', label: 'Billing History' },
-            { id: 'usage', label: 'Usage Analytics' }
-          ].map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              style={{
-                background: activeTab === tab.id ? 'rgba(255,255,255,0.2)' : 'transparent',
-                border: 'none',
-                padding: '12px 24px',
-                borderRadius: 12,
-                color: 'white',
-                cursor: 'pointer',
-                fontSize: 16,
-                fontWeight: activeTab === tab.id ? 600 : 400,
-                transition: 'all 0.2s ease'
-              }}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Overview Tab */}
-        {activeTab === 'overview' && (
-          <div>
-            {/* Current Plan & Credits */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-              gap: 24,
-              marginBottom: 32
-            }}>
+        {loading || credits === null || !usageData || !invoices ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 400 }}>
+            <div style={{ width: 48, height: 48, border: '6px solid #e5e7eb', borderTop: '6px solid #4ecdc4', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: 18 }} />
+            <div style={{ color: '#fff', fontSize: 18, fontWeight: 500 }}>Loading billing data...</div>
+            <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+          </div>
+        ) : (
+          <>
+            {showModal && modalStatus && (
               <div style={{
-                background: 'rgba(255,255,255,0.10)',
-                borderRadius: 20,
-                padding: 24,
-                border: '1.5px solid rgba(255,255,255,0.18)',
+                position: 'fixed',
+                top: 32,
+                left: '50%',
+                transform: 'translateX(-50%)',
+                zIndex: 2000,
+                minWidth: 340,
+                maxWidth: '90vw',
+                background: modalStatus === 'success'
+                  ? '#4ecdc4'
+                  : modalStatus === 'cancel'
+                    ? '#ffd93d'
+                    : '#ff6b6b',
+                color: modalStatus === 'cancel' ? '#333' : 'white',
+                borderRadius: 18,
+                boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.37)',
+                padding: '28px 40px 24px 40px',
+                textAlign: 'center',
+                fontFamily: 'Poppins, Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+                fontWeight: 600,
+                fontSize: 18,
+                animation: 'toastSlideDown 0.5s cubic-bezier(0.4,2,0.6,1)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                pointerEvents: 'auto',
               }}>
-                <h3 style={{ color: 'white', marginBottom: 12, fontSize: 18 }}>Current Credits</h3>
-                <div style={{ fontSize: 36, fontWeight: 700, color: '#4ecdc4', marginBottom: 8 }}>
-                  {usageData.currentCredits}
-                </div>
-                <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>
-                  of {usageData.totalCredits} total credits
-                </div>
+                <button onClick={() => setShowModal(false)} style={{ position: 'absolute', top: 10, right: 18, background: 'none', border: 'none', color: '#fff', fontSize: 22, cursor: 'pointer', opacity: 0.7 }}>×</button>
+                {modalStatus === 'success' && (
+                  <>
+                    {/* Animated checkmark and confetti */}
+                    <div style={{ position: 'relative', marginBottom: 12, width: 60, height: 60 }}>
+                      <svg width="60" height="60" viewBox="0 0 60 60">
+                        <circle cx="30" cy="30" r="28" fill="none" stroke="#fff" strokeWidth="4" opacity="0.2" />
+                        <polyline points="18,32 28,42 44,22" fill="none" stroke="#fff" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round">
+                          <animate attributeName="stroke-dasharray" from="0,60" to="60,0" dur="0.7s" fill="freeze" />
+                        </polyline>
+                      </svg>
+                      {/* Confetti SVG burst */}
+                      <svg width="60" height="60" style={{ position: 'absolute', left: 0, top: 0, pointerEvents: 'none' }}>
+                        <circle cx="10" cy="10" r="3" fill="#ff6b6b">
+                          <animate attributeName="cy" from="10" to="-10" dur="0.7s" fill="freeze" />
+                        </circle>
+                        <circle cx="50" cy="10" r="3" fill="#4ecdc4">
+                          <animate attributeName="cy" from="10" to="-10" dur="0.7s" fill="freeze" />
+                        </circle>
+                        <circle cx="30" cy="50" r="3" fill="#ffd93d">
+                          <animate attributeName="cy" from="50" to="70" dur="0.7s" fill="freeze" />
+                        </circle>
+                      </svg>
+                    </div>
+                    <div style={{ fontWeight: 700, fontSize: 22, marginBottom: 6 }}>Payment Successful!</div>
+                    <div style={{ fontSize: 16, fontWeight: 400 }}>Thank you for your purchase. Your credits will be added shortly.</div>
+                  </>
+                )}
+                {modalStatus === 'cancel' && (
+                  <>
+                    {/* Animated sad face */}
+                    <div style={{ fontSize: 44, marginBottom: 10, animation: 'shake 0.7s' }}>😕</div>
+                    <div style={{ fontWeight: 700, fontSize: 22, marginBottom: 6 }}>Payment Canceled</div>
+                    <div style={{ fontSize: 16, fontWeight: 400 }}>Your payment was canceled. No credits were added.</div>
+                  </>
+                )}
+                {modalStatus === 'failed' && (
+                  <>
+                    {/* Animated sad face */}
+                    <div style={{ fontSize: 44, marginBottom: 10, animation: 'shake 0.7s' }}>😞</div>
+                    <div style={{ fontWeight: 700, fontSize: 22, marginBottom: 6 }}>Payment Failed</div>
+                    <div style={{ fontSize: 16, fontWeight: 400 }}>There was an error processing your payment. Please try again or contact support.</div>
+                  </>
+                )}
+                <style>{`
+                  @keyframes toastSlideDown { 0% { transform: translate(-50%, -40px); opacity: 0; } 100% { transform: translate(-50%, 0); opacity: 1; } }
+                  @keyframes shake { 0% { transform: translateX(0); } 20% { transform: translateX(-8px); } 40% { transform: translateX(8px); } 60% { transform: translateX(-8px); } 80% { transform: translateX(8px); } 100% { transform: translateX(0); } }
+                `}</style>
+              </div>
+            )}
+            <h2 style={{ fontWeight: 700, fontSize: 32, color: 'white', letterSpacing: 1, marginBottom: 24 }}>
+              Credits & Billing
+            </h2>
+
+            {/* Info box about credits */}
+            <div style={{
+              background: 'rgba(76,205,196,0.12)',
+              color: '#4ecdc4',
+              borderRadius: 12,
+              padding: '16px 24px',
+              marginBottom: 24,
+              fontSize: 15,
+              fontWeight: 500,
+              border: '1.5px solid #4ecdc4',
+              width: '100%'
+            }}>
+              <span style={{ color: '#fff', fontWeight: 700 }}>How credits work:</span> Buy credits in advance and use them to generate images. Each image generation consumes credits. Top up anytime—no recurring subscription required.
+            </div>
+
+            {/* Tab Navigation */}
+            <div style={{
+              display: 'flex',
+              gap: 8,
+              marginBottom: 32,
+              borderBottom: '1px solid rgba(255,255,255,0.1)',
+              paddingBottom: 16
+            }}>
+              {[
+                { id: 'overview', label: 'Overview' },
+                { id: 'billing', label: 'Billing History' },
+                { id: 'usage', label: 'Usage Analytics' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as any)}
+                  style={{
+                    background: activeTab === tab.id ? 'rgba(255,255,255,0.2)' : 'transparent',
+                    border: 'none',
+                    padding: '12px 24px',
+                    borderRadius: 12,
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: 16,
+                    fontWeight: activeTab === tab.id ? 600 : 400,
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Overview Tab */}
+            {activeTab === 'overview' && (
+              <div>
+                {/* Current Plan & Credits */}
                 <div style={{
-                  width: '100%',
-                  height: 8,
-                  background: 'rgba(255,255,255,0.1)',
-                  borderRadius: 4,
-                  marginTop: 12,
-                  overflow: 'hidden'
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+                  gap: 24,
+                  marginBottom: 32
                 }}>
                   <div style={{
-                    width: `${(usageData.currentCredits / usageData.totalCredits) * 100}%`,
-                    height: '100%',
-                    background: 'linear-gradient(90deg, #4ecdc4, #44a08d)',
-                    borderRadius: 4
-                  }} />
-                </div>
-              </div>
-
-              <div style={{
-                background: 'rgba(255,255,255,0.10)',
-                borderRadius: 20,
-                padding: 24,
-                border: '1.5px solid rgba(255,255,255,0.18)',
-              }}>
-                <h3 style={{ color: 'white', marginBottom: 12, fontSize: 18 }}>This Month</h3>
-                <div style={{ fontSize: 36, fontWeight: 700, color: '#ff6b6b', marginBottom: 8 }}>
-                  {usageData.usedThisMonth}
-                </div>
-                <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>
-                  credits used
-                </div>
-              </div>
-
-              <div style={{
-                background: 'rgba(255,255,255,0.10)',
-                borderRadius: 20,
-                padding: 24,
-                border: '1.5px solid rgba(255,255,255,0.18)',
-              }}>
-                <h3 style={{ color: 'white', marginBottom: 12, fontSize: 18 }}>Monthly Average</h3>
-                <div style={{ fontSize: 36, fontWeight: 700, color: '#667eea', marginBottom: 8 }}>
-                  {usageData.monthlyAverage}
-                </div>
-                <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>
-                  credits per month
-                </div>
-              </div>
-            </div>
-
-            {/* Credit Packages */}
-            <h3 style={{ color: 'white', marginBottom: 24, fontSize: 24, fontWeight: 600 }}>
-              Purchase Credits
-            </h3>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-              gap: 24,
-              marginBottom: 32
-            }}>
-              {creditPackages.map(pkg => (
-                <div
-                  key={pkg.id}
-                  style={{
-                    background: pkg.popular ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.10)',
+                    background: 'rgba(255,255,255,0.10)',
                     borderRadius: 20,
                     padding: 24,
-                    border: pkg.popular ? '2px solid #4ecdc4' : '1.5px solid rgba(255,255,255,0.18)',
-                    position: 'relative',
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  {pkg.popular && (
-                    <div style={{
-                      position: 'absolute',
-                      top: -12,
-                      left: '50%',
-                      transform: 'translateX(-50%)',
-                      background: '#4ecdc4',
-                      color: 'white',
-                      padding: '4px 16px',
-                      borderRadius: 12,
-                      fontSize: 12,
-                      fontWeight: 600
-                    }}>
-                      MOST POPULAR
+                    border: '1.5px solid rgba(255,255,255,0.18)',
+                  }}>
+                    <h3 style={{ color: 'white', marginBottom: 12, fontSize: 18 }}>Current Credits</h3>
+                    <div style={{ fontSize: 36, fontWeight: 700, color: '#4ecdc4', marginBottom: 8 }}>
+                      {credits ? credits.toLocaleString() : 'Loading...'}
                     </div>
-                  )}
-                  
-                  <h4 style={{ color: 'white', marginBottom: 8, fontSize: 20, fontWeight: 600 }}>
-                    {pkg.name}
-                  </h4>
-                  
-                  <div style={{ marginBottom: 16 }}>
-                    <span style={{ fontSize: 32, fontWeight: 700, color: '#4ecdc4' }}>
-                      ${pkg.price}
-                    </span>
-                    {pkg.originalPrice && (
-                      <span style={{
-                        fontSize: 18,
-                        color: 'rgba(255,255,255,0.5)',
-                        textDecoration: 'line-through',
-                        marginLeft: 8
-                      }}>
-                        ${pkg.originalPrice}
-                      </span>
-                    )}
-                  </div>
-
-                  <div style={{ marginBottom: 24 }}>
-                    <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginBottom: 4 }}>
-                      {pkg.credits.toLocaleString()} Credits
-                    </div>
-                    <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>
-                      ${(pkg.price / pkg.credits).toFixed(2)} per credit
+                    <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginBottom: 8 }}>
+                      credits available
                     </div>
                   </div>
-
-                  <ul style={{ marginBottom: 24, paddingLeft: 20 }}>
-                    {pkg.features.map((feature, index) => (
-                      <li key={index} style={{
-                        color: 'rgba(255,255,255,0.8)',
-                        marginBottom: 8,
-                        fontSize: 14
-                      }}>
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-
-                  <button
-                    onClick={() => handlePurchase(pkg.id)}
-                    style={{
-                      width: '100%',
-                      background: pkg.popular ? '#4ecdc4' : 'rgba(255,255,255,0.1)',
-                      color: pkg.popular ? 'white' : 'white',
-                      border: 'none',
-                      padding: '16px',
-                      borderRadius: 12,
-                      fontSize: 16,
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    Purchase Now
-                  </button>
+                  <div />
+                  <div />
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
 
-        {/* Billing History Tab */}
-        {activeTab === 'billing' && (
-          <div>
-            <h3 style={{ color: 'white', marginBottom: 24, fontSize: 24, fontWeight: 600 }}>
-              Billing History
-            </h3>
-            <div style={{
-              background: 'rgba(255,255,255,0.10)',
-              borderRadius: 20,
-              padding: 24,
-              border: '1.5px solid rgba(255,255,255,0.18)',
-            }}>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: '1fr 1fr 1fr 1fr auto',
-                gap: 16,
-                padding: '16px 0',
-                borderBottom: '1px solid rgba(255,255,255,0.1)',
-                fontWeight: 600,
-                color: 'rgba(255,255,255,0.8)',
-                fontSize: 14
-              }}>
-                <div>Invoice</div>
-                <div>Date</div>
-                <div>Amount</div>
-                <div>Status</div>
-                <div>Actions</div>
-              </div>
-              
-              {invoices.map(invoice => (
-                <div
-                  key={invoice.id}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '1fr 1fr 1fr 1fr auto',
-                    gap: 16,
-                    padding: '16px 0',
-                    borderBottom: '1px solid rgba(255,255,255,0.05)',
-                    alignItems: 'center'
-                  }}
-                >
-                  <div style={{ color: 'white', fontWeight: 500 }}>
-                    {invoice.id}
-                  </div>
-                  <div style={{ color: 'rgba(255,255,255,0.8)' }}>
-                    {new Date(invoice.date).toLocaleDateString()}
-                  </div>
-                  <div style={{ color: 'white', fontWeight: 500 }}>
-                    ${invoice.amount.toFixed(2)}
-                  </div>
-                  <div>
-                    <span style={{
-                      background: getStatusColor(invoice.status),
-                      color: 'white',
-                      padding: '4px 12px',
-                      borderRadius: 12,
-                      fontSize: 12,
-                      fontWeight: 500
-                    }}>
-                      {getStatusText(invoice.status)}
-                    </span>
-                  </div>
-                  <div>
-                    <button
+                {/* Credit Packages */}
+                <h3 style={{ color: 'white', marginBottom: 24, fontSize: 24, fontWeight: 600 }}>
+                  Buy More Credits
+                </h3>
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                  gap: 24,
+                  marginBottom: 32
+                }}>
+                  {creditPackages.map(pkg => (
+                    <div
+                      key={pkg.id}
                       style={{
-                        background: 'rgba(255,255,255,0.1)',
-                        border: 'none',
-                        padding: '8px 16px',
-                        borderRadius: 8,
-                        color: 'white',
-                        cursor: 'pointer',
-                        fontSize: 12
+                        background: pkg.popular ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.10)',
+                        borderRadius: 20,
+                        padding: 24,
+                        border: pkg.popular ? '2px solid #4ecdc4' : '1.5px solid rgba(255,255,255,0.18)',
+                        position: 'relative',
+                        transition: 'all 0.3s ease',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        height: '100%'
                       }}
                     >
-                      Download
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
+                      {pkg.popular && (
+                        <div style={{
+                          position: 'absolute',
+                          top: -12,
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          background: '#4ecdc4',
+                          color: 'white',
+                          padding: '4px 16px',
+                          borderRadius: 12,
+                          fontSize: 12,
+                          fontWeight: 600
+                        }}>
+                          MOST POPULAR
+                        </div>
+                      )}
 
-        {/* Usage Analytics Tab */}
-        {activeTab === 'usage' && (
-          <div>
-            <h3 style={{ color: 'white', marginBottom: 24, fontSize: 24, fontWeight: 600 }}>
-              Usage Analytics
-            </h3>
-            
-            {/* Usage Chart */}
-            <div style={{
-              background: 'rgba(255,255,255,0.10)',
-              borderRadius: 20,
-              padding: 24,
-              border: '1.5px solid rgba(255,255,255,0.18)',
-              marginBottom: 24
-            }}>
-              <h4 style={{ color: 'white', marginBottom: 20, fontSize: 18 }}>Monthly Usage Trend</h4>
-              <div style={{
-                display: 'flex',
-                alignItems: 'end',
-                gap: 16,
-                height: 200,
-                padding: '20px 0'
-              }}>
-                {usageData.usageHistory.map((month, index) => {
-                  const maxUsage = Math.max(...usageData.usageHistory.map(m => m.credits));
-                  const height = (month.credits / maxUsage) * 100;
-                  return (
-                    <div key={index} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                      <div style={{
-                        width: '100%',
-                        height: `${height}%`,
-                        background: 'linear-gradient(180deg, #4ecdc4, #44a08d)',
-                        borderRadius: '8px 8px 0 0',
-                        minHeight: 20
-                      }} />
-                      <div style={{
-                        color: 'rgba(255,255,255,0.7)',
-                        fontSize: 12,
-                        marginTop: 8,
-                        textAlign: 'center'
-                      }}>
-                        {month.credits}
+                      <h4 style={{ color: 'white', marginBottom: 8, fontSize: 20, fontWeight: 600 }}>
+                        {pkg.name}
+                      </h4>
+
+                      <div style={{ marginBottom: 16 }}>
+                        <span style={{ fontSize: 32, fontWeight: 700, color: '#4ecdc4' }}>
+                          ${pkg.price}
+                        </span>
+                        {pkg.originalPrice && (
+                          <span style={{
+                            fontSize: 18,
+                            color: 'rgba(255,255,255,0.5)',
+                            textDecoration: 'line-through',
+                            marginLeft: 8
+                          }}>
+                            ${pkg.originalPrice}
+                          </span>
+                        )}
                       </div>
-                      <div style={{
-                        color: 'rgba(255,255,255,0.5)',
-                        fontSize: 10,
-                        marginTop: 4
-                      }}>
-                        {new Date(month.date).toLocaleDateString('en-US', { month: 'short' })}
+
+                      <div style={{ marginBottom: 24 }}>
+                        <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginBottom: 4 }}>
+                          {pkg.credits.toLocaleString()} Credits
+                        </div>
+                        <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>
+                          ${(pkg.price / pkg.credits).toFixed(2)} per credit
+                        </div>
+                      </div>
+
+                      <ul style={{ marginBottom: 24, paddingLeft: 20 }}>
+                        {pkg.features.map((feature, index) => (
+                          <li key={index} style={{
+                            color: 'rgba(255,255,255,0.8)',
+                            marginBottom: 8,
+                            fontSize: 14
+                          }}>
+                            {feature}
+                          </li>
+                        ))}
+                      </ul>
+
+                      <div style={{ marginTop: 'auto' }}>
+                        <button
+                          onClick={() => handleStripePurchase(pkg)}
+                          style={{
+                            width: '100%',
+                            background: pkg.popular ? '#4ecdc4' : 'rgba(255,255,255,0.1)',
+                            color: pkg.popular ? 'white' : 'white',
+                            border: 'none',
+                            padding: '16px',
+                            borderRadius: 12,
+                            fontSize: 16,
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            transition: 'all 0.2s ease'
+                          }}
+                          disabled={buying}
+                        >
+                          Buy
+                        </button>
                       </div>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Usage Stats */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-              gap: 24
-            }}>
-              <div style={{
-                background: 'rgba(255,255,255,0.10)',
-                borderRadius: 20,
-                padding: 24,
-                border: '1.5px solid rgba(255,255,255,0.18)',
-              }}>
-                <h4 style={{ color: 'white', marginBottom: 12, fontSize: 16 }}>Peak Usage</h4>
-                <div style={{ fontSize: 28, fontWeight: 700, color: '#ff6b6b' }}>
-                  {Math.max(...usageData.usageHistory.map(m => m.credits))}
-                </div>
-                <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>
-                  credits in a month
-                </div>
-              </div>
+            {/* Billing History Tab */}
+            {activeTab === 'billing' && (
+              <div>
+                <h3 style={{ color: 'white', marginBottom: 24, fontSize: 24, fontWeight: 600 }}>
+                  Credit Purchase History
+                </h3>
+                <div style={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                  <div style={{
+                    background: 'rgba(255,255,255,0.10)',
+                    borderRadius: 20,
+                    padding: 24,
+                    border: '1.5px solid rgba(255,255,255,0.18)',
+                    maxWidth: 950,
+                    width: '100%'
+                  }}>
+                    {invoicesLoading ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 200 }}>
+                        <div style={{ width: 36, height: 36, border: '5px solid #e5e7eb', borderTop: '5px solid #4ecdc4', borderRadius: '50%', animation: 'spin 1s linear infinite', marginBottom: 12 }} />
+                        <div style={{ color: '#fff', fontSize: 16, fontWeight: 500 }}>Loading billing history...</div>
+                        <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
+                      </div>
+                    ) : (
+                      <>
+                        <div style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(5, 1fr)',
+                          gap: 16,
+                          padding: '16px 0',
+                          borderBottom: '1px solid rgba(255,255,255,0.1)',
+                          fontWeight: 600,
+                          color: 'rgba(255,255,255,0.8)',
+                          fontSize: 14,
+                          textAlign: 'center'
+                        }}>
+                          <div>Invoice</div>
+                          <div>Date</div>
+                          <div>Amount</div>
+                          <div>Description</div>
+                          <div>Actions</div>
+                        </div>
 
-              <div style={{
-                background: 'rgba(255,255,255,0.10)',
-                borderRadius: 20,
-                padding: 24,
-                border: '1.5px solid rgba(255,255,255,0.18)',
-              }}>
-                <h4 style={{ color: 'white', marginBottom: 12, fontSize: 16 }}>Average Daily</h4>
-                <div style={{ fontSize: 28, fontWeight: 700, color: '#667eea' }}>
-                  {Math.round(usageData.monthlyAverage / 30)}
-                </div>
-                <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>
-                  credits per day
-                </div>
-              </div>
+                        {invoices.length === 0 && (
+                          <div style={{
+                            padding: '32px 0',
+                            color: 'rgba(255,255,255,0.6)',
+                            textAlign: 'center',
+                            fontSize: 16,
+                            fontWeight: 500
+                          }}>
+                            No purchases yet. Buy credits to see your billing history here.
+                          </div>
+                        )}
 
-              <div style={{
-                background: 'rgba(255,255,255,0.10)',
-                borderRadius: 20,
-                padding: 24,
-                border: '1.5px solid rgba(255,255,255,0.18)',
-              }}>
-                <h4 style={{ color: 'white', marginBottom: 12, fontSize: 16 }}>Total Spent</h4>
-                <div style={{ fontSize: 28, fontWeight: 700, color: '#4ecdc4' }}>
-                  ${(invoices.reduce((sum, inv) => sum + inv.amount, 0)).toFixed(2)}
-                </div>
-                <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>
-                  lifetime total
+                        {invoices.map(invoice => {
+                          console.log('Invoice ID:', invoice.id, 'Download URL:', invoice.downloadUrl);
+                          return (
+                            <div
+                              key={invoice.id}
+                              style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(5, 1fr)',
+                                gap: 16,
+                                padding: '16px 0',
+                                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                                alignItems: 'center',
+                                textAlign: 'center'
+                              }}
+                            >
+                              <div style={{ color: 'white', fontWeight: 500, fontSize: 13 }}>
+                                #{invoice.id.slice(-5)}
+                              </div>
+                              <div style={{ color: 'rgba(255,255,255,0.8)' }}>
+                                {new Date(invoice.date).toLocaleString(undefined, { month: 'short', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                              <div style={{ color: 'white', fontWeight: 500 }}>${invoice.amount.toFixed(2)}</div>
+                              <div style={{ color: 'rgba(255,255,255,0.9)', fontSize: 14 }}>{invoice.description}</div>
+                              <div>
+                                <button
+                                  style={{
+                                    background: invoice.downloadUrl ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.05)',
+                                    border: 'none',
+                                    padding: '8px 16px',
+                                    borderRadius: 8,
+                                    color: invoice.downloadUrl ? 'white' : 'rgba(255,255,255,0.5)',
+                                    cursor: invoice.downloadUrl ? 'pointer' : 'not-allowed',
+                                    fontSize: 12
+                                  }}
+                                  disabled={!invoice.downloadUrl}
+                                  aria-label={invoice.downloadUrl ? 'View Receipt' : 'Receipt not available'}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    if (invoice.downloadUrl) {
+                                      window.open(invoice.downloadUrl, '_blank', 'noopener noreferrer');
+                                    }
+                                  }}
+                                >
+                                  View Receipt
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
+            )}
+
+            {/* Usage Analytics Tab */}
+            {activeTab === 'usage' && (
+              <div>
+                <h3 style={{ color: 'white', marginBottom: 24, fontSize: 24, fontWeight: 600 }}>
+                  Usage Analytics
+                </h3>
+                {/* Toggle for credits/money and warning message side by side */}
+                <div style={{ marginBottom: 24 }}>
+                  <div>
+                    <button
+                      onClick={() => setShowAs('credits')}
+                      style={{
+                        background: showAs === 'credits' ? '#4ecdc4' : 'rgba(255,255,255,0.08)',
+                        color: showAs === 'credits' ? '#fff' : '#4ecdc4',
+                        border: 'none',
+                        borderRadius: 8,
+                        padding: '6px 18px',
+                        marginRight: 8,
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Show as Credits
+                    </button>
+                    <button
+                      onClick={() => setShowAs('money')}
+                      style={{
+                        background: showAs === 'money' ? '#4ecdc4' : 'rgba(255,255,255,0.08)',
+                        color: showAs === 'money' ? '#fff' : '#4ecdc4',
+                        border: 'none',
+                        borderRadius: 8,
+                        padding: '6px 18px',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Show as Money
+                    </button>
+                  </div>
+                  <div style={{ marginTop: 8 }}>
+                    <div style={{
+                      color: '#e0e0e0',
+                      fontSize: 13,
+                      lineHeight: 1.4,
+                      transition: 'opacity 0.2s',
+                      opacity: showAs === 'money' ? 1 : 0,
+                      whiteSpace: 'normal',
+                      maxWidth: 340,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      wordBreak: 'break-word',
+                      fontWeight: 400,
+                      pointerEvents: 'none'
+                    }}>
+                      Money values are estimated using the average cost per credit for this period, based on your purchases. Actual cost may vary due to different plans and bulk discounts.
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <label htmlFor="period-select" style={{ color: 'white', fontWeight: 500, marginRight: 6 }}>Period:</label>
+                    <select
+                      id="period-select"
+                      value={period}
+                      onChange={e => { setPeriod(e.target.value as any); fetchUsageData(e.target.value as any, startDate, endDate); }}
+                      style={{
+                        padding: '7px 18px',
+                        borderRadius: 10,
+                        border: '1.5px solid rgba(255,255,255,0.18)',
+                        background: 'rgba(30,32,38,0.92)',
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: 15,
+                        outline: 'none',
+                        boxShadow: '0 2px 8px 0 rgba(0,0,0,0.10)',
+                        transition: 'border 0.2s, box-shadow 0.2s, background 0.2s',
+                        cursor: 'pointer',
+                      }}
+                      onFocus={e => e.currentTarget.style.border = '1.5px solid #4ecdc4'}
+                      onBlur={e => e.currentTarget.style.border = '1.5px solid rgba(255,255,255,0.18)'}
+                      onMouseOver={e => e.currentTarget.style.background = 'rgba(40,44,54,1)'}
+                      onMouseOut={e => e.currentTarget.style.background = 'rgba(30,32,38,0.92)'}
+                    >
+                      <option value="daily">Daily</option>
+                      <option value="weekly">Weekly</option>
+                      <option value="monthly">Monthly</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <label htmlFor="start-date" style={{ color: 'white', fontWeight: 500, marginRight: 6 }}>Start Date:</label>
+                    <input
+                      id="start-date"
+                      type="date"
+                      value={startDate}
+                      onChange={e => { setStartDate(e.target.value); fetchUsageData(period, e.target.value, endDate); }}
+                      style={{
+                        padding: '7px 18px',
+                        borderRadius: 10,
+                        border: '1.5px solid rgba(255,255,255,0.18)',
+                        background: 'rgba(30,32,38,0.92)',
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: 15,
+                        outline: 'none',
+                        boxShadow: '0 2px 8px 0 rgba(0,0,0,0.10)',
+                        transition: 'border 0.2s, box-shadow 0.2s, background 0.2s',
+                        cursor: 'pointer',
+                      }}
+                      onFocus={e => e.currentTarget.style.border = '1.5px solid #4ecdc4'}
+                      onBlur={e => e.currentTarget.style.border = '1.5px solid rgba(255,255,255,0.18)'}
+                      onMouseOver={e => e.currentTarget.style.background = 'rgba(40,44,54,1)'}
+                      onMouseOut={e => e.currentTarget.style.background = 'rgba(30,32,38,0.92)'}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <label htmlFor="end-date" style={{ color: 'white', fontWeight: 500, marginRight: 6 }}>End Date:</label>
+                    <input
+                      id="end-date"
+                      type="date"
+                      value={endDate}
+                      onChange={e => { setEndDate(e.target.value); fetchUsageData(period, startDate, e.target.value); }}
+                      style={{
+                        padding: '7px 18px',
+                        borderRadius: 10,
+                        border: '1.5px solid rgba(255,255,255,0.18)',
+                        background: 'rgba(30,32,38,0.92)',
+                        color: '#fff',
+                        fontWeight: 600,
+                        fontSize: 15,
+                        outline: 'none',
+                        boxShadow: '0 2px 8px 0 rgba(0,0,0,0.10)',
+                        transition: 'border 0.2s, box-shadow 0.2s, background 0.2s',
+                        cursor: 'pointer',
+                      }}
+                      onFocus={e => e.currentTarget.style.border = '1.5px solid #4ecdc4'}
+                      onBlur={e => e.currentTarget.style.border = '1.5px solid rgba(255,255,255,0.18)'}
+                      onMouseOver={e => e.currentTarget.style.background = 'rgba(40,44,54,1)'}
+                      onMouseOut={e => e.currentTarget.style.background = 'rgba(30,32,38,0.92)'}
+                    />
+                  </div>
+                </div>
+                {usageLoading ? (
+                  <div style={{ color: 'white', fontSize: 16 }}>Loading usage analytics...</div>
+                ) : usageError ? (
+                  <div style={{ color: '#ff6b6b', fontSize: 16 }}>{usageError}</div>
+                ) : usageData && usageData.usageHistory.length > 0 ? (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: 24, marginBottom: 32 }}>
+                      {/* Peak Usage Card */}
+                      <div style={{ background: 'rgba(255,255,255,0.10)', borderRadius: 20, padding: 24, border: '1.5px solid rgba(255,255,255,0.18)' }}>
+                        <h4 style={{ color: 'white', marginBottom: 12, fontSize: 16 }}>Peak Usage</h4>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: '#ff6b6b' }}>
+                          {showAs === 'credits'
+                            ? (usageData.usageHistory.length > 0 ? Math.max(...usageData.usageHistory.map(m => m.credits)) : 0)
+                            : (usageData.usageHistory.length > 0 ? `$${(Math.max(...usageData.usageHistory.map(m => m.credits)) * costPerCredit).toFixed(2)}` : '$0.00')}
+                        </div>
+                        <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>
+                          {showAs === 'credits'
+                            ? `credits in a ${period} period`
+                            : `money spent in a ${period} period`}
+                        </div>
+                      </div>
+                      {/* Average Card */}
+                      <div style={{ background: 'rgba(255,255,255,0.10)', borderRadius: 20, padding: 24, border: '1.5px solid rgba(255,255,255,0.18)' }}>
+                        <h4 style={{ color: 'white', marginBottom: 12, fontSize: 16 }}>Average</h4>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: '#667eea' }}>
+                          {showAs === 'credits'
+                            ? usageData.average
+                            : `$${(usageData.average * costPerCredit).toFixed(2)}`}
+                        </div>
+                        <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>
+                          {showAs === 'credits'
+                            ? `credits per ${period} period`
+                            : `money spent per ${period} period`}
+                        </div>
+                      </div>
+                      {/* Total Used Card */}
+                      <div style={{ background: 'rgba(255,255,255,0.10)', borderRadius: 20, padding: 24, border: '1.5px solid rgba(255,255,255,0.18)' }}>
+                        <h4 style={{ color: 'white', marginBottom: 12, fontSize: 16 }}>Total Used</h4>
+                        <div style={{ fontSize: 28, fontWeight: 700, color: '#4ecdc4' }}>
+                          {showAs === 'credits'
+                            ? usageData.totalCredits
+                            : `$${(usageData.totalCredits * costPerCredit).toFixed(2)}`}
+                        </div>
+                        <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>
+                          {showAs === 'credits'
+                            ? 'total credits used'
+                            : 'total money spent'}
+                        </div>
+                      </div>
+                    </div>
+                    {/* Usage Analytics Card */}
+                    <div style={{
+                      background: 'rgba(255,255,255,0.07)',
+                      borderRadius: 20,
+                      border: '1.5px solid rgba(255,255,255,0.13)',
+                      boxShadow: '0 2px 16px 0 rgba(76,205,196,0.07)',
+                      padding: 32,
+                      marginBottom: 40,
+                      width: '100%',
+                      position: 'relative',
+                    }}>
+                      <div style={{ fontWeight: 600, fontSize: 18, color: 'white', marginBottom: 8 }}>Credit Usage per {period.charAt(0).toUpperCase() + period.slice(1)}</div>
+                      <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginBottom: 24 }}>The bars below show the number of credits consumed in each period for your account.</div>
+                      {/* Before rendering UsageBarChart, calculate costPerCredit for the period */}
+                      <UsageBarChart
+                        usageHistory={usageData.usageHistory}
+                        period={period}
+                        height={320}
+                        accentGradient={["#4ecdc4", "#44a08d"]}
+                        showAs={showAs}
+                        costPerCredit={costPerCredit}
+                      />
+                    </div>
+
+                    {/* Balance Evolution Card */}
+                    <div style={{
+                      background: 'rgba(255,255,255,0.07)',
+                      borderRadius: 20,
+                      border: '1.5px solid rgba(255,255,255,0.13)',
+                      boxShadow: '0 2px 16px 0 rgba(76,205,196,0.07)',
+                      padding: 32,
+                      marginBottom: 32,
+                      width: '100%',
+                      position: 'relative',
+                    }}>
+                      <div style={{ fontWeight: 600, fontSize: 18, color: 'white', marginBottom: 8 }}>Balance Evolution</div>
+                      <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginBottom: 24 }}>The curve below shows your remaining credit balance at the end of each period, reflecting top-ups and usage over time.</div>
+                      {/* In SubscriptionPage, pass showAs and costPerCredit to BalanceCurve */}
+                      <BalanceCurve
+                        balanceHistory={usageData.balanceHistory}
+                        height={320}
+                        accentGradient={["#4ecdc4", "#44a08d"]}
+                        showAs={showAs}
+                        costPerCredit={costPerCredit}
+                      />
+                    </div>
+                  </>
+                ) : null}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
   );
 };
 
-export default SubscriptionPage; 
+export default SubscriptionPage;
+
+// Custom hook to measure container width
+function useContainerWidth() {
+  const ref = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState<number>(0);
+  useLayoutEffect(() => {
+    function updateWidth() {
+      if (ref.current) setWidth(ref.current.offsetWidth);
+    }
+    updateWidth();
+    window.addEventListener('resize', updateWidth);
+    return () => window.removeEventListener('resize', updateWidth);
+  }, []);
+  return [ref, width] as const;
+}
+
+function UsageBarChart({ usageHistory, period, height, accentGradient, showAs = 'credits', costPerCredit = 0 }: {
+  usageHistory: { date: string; credits: number }[];
+  period: string;
+  height: number;
+  accentGradient: [string, string];
+  showAs?: 'credits' | 'money';
+  costPerCredit?: number;
+}): JSX.Element {
+  const [hovered, setHovered] = useState<number | null>(null);
+  const [containerRef, width] = useContainerWidth();
+  const barCount = usageHistory.length;
+  // Use either credits or money for the bars
+  const values = usageHistory.map(m => showAs === 'credits' ? m.credits : +(m.credits * costPerCredit).toFixed(2));
+  const usageMax = Math.max(...values);
+  const usageMin = Math.min(...values);
+  const usageRange = usageMax - usageMin || 1;
+  const labelInterval = Math.ceil(barCount / 10); // Show labels every 10th bar
+  return (
+    <div ref={containerRef} style={{ width: '100%', height, position: 'relative' }}>
+      {width > 0 && (
+        <>
+          <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block', position: 'absolute', left: 0, top: 0 }}>
+            {/* Grid lines */}
+            {[0.25, 0.5, 0.75].map((frac: number, i: number) => (
+              <line
+                key={i}
+                x1={0}
+                x2={width}
+                y1={height * frac}
+                y2={height * frac}
+                stroke="rgba(255,255,255,0.08)"
+                strokeWidth={1}
+              />
+            ))}
+            {/* Bars */}
+            {usageHistory.map((periodData: { date: string; credits: number }, i: number) => {
+              const value = values[i];
+              const barHeight = ((value - usageMin) / usageRange) * (height - 40);
+              const x = (i + 0.5) * (width / barCount);
+              return (
+                <g key={i} onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)} style={{ cursor: 'pointer' }}>
+                  <rect
+                    x={x - 18}
+                    y={height - barHeight - 24}
+                    width={36}
+                    height={barHeight}
+                    rx={8}
+                    fill={`url(#bar-gradient)`}
+                    style={{ filter: hovered === i ? 'drop-shadow(0 2px 12px #4ecdc488)' : 'none', transition: 'filter 0.2s' }}
+                  />
+                  {/* Data label (show on hover or always for mobile) */}
+                  {(hovered === i) && (
+                    <foreignObject x={x - 24} y={height - barHeight - 48} width={64} height={24} style={{ pointerEvents: 'none' }}>
+                      <div style={{ color: '#fff', fontSize: 14, fontWeight: 700, background: 'rgba(30,32,38,0.92)', borderRadius: 8, padding: '2px 0', textAlign: 'center', boxShadow: '0 2px 8px 0 rgba(0,0,0,0.12)' }}>
+                        {showAs === 'credits' ? value : `$${value}`}
+                      </div>
+                    </foreignObject>
+                  )}
+                </g>
+              );
+            })}
+            {/* Gradient for bars */}
+            <defs>
+              <linearGradient id="bar-gradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={accentGradient[0]} />
+                <stop offset="100%" stopColor={accentGradient[1]} />
+              </linearGradient>
+            </defs>
+          </svg>
+          {/* X-axis labels */}
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              bottom: 0,
+              width: width,
+              minWidth: '100%',
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: 12,
+              color: 'rgba(255,255,255,0.5)',
+              zIndex: 3,
+              alignItems: 'flex-end',
+            }}
+          >
+            {usageHistory.map((period: { date: string }, i: number) => (
+              <div
+                key={i}
+                style={{
+                  flex: 1,
+                  textAlign: 'center',
+                  height: barCount > 16 ? 48 : 'auto',
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  justifyContent: 'center',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {(i % labelInterval === 0 || i === barCount - 1) && (
+                  <span
+                    style={barCount > 16 ? {
+                      display: 'inline-block',
+                      transform: 'rotate(-45deg)',
+                      transformOrigin: 'bottom left',
+                      marginBottom: 4,
+                      marginLeft: 2,
+                      marginRight: 2,
+                    } : {}}>
+                    {period.date}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function BalanceCurve({ balanceHistory, height, accentGradient, showAs = 'credits', costPerCredit = 0 }: {
+  balanceHistory: { date: string; balance: number }[];
+  height: number;
+  accentGradient: [string, string];
+  showAs?: 'credits' | 'money';
+  costPerCredit?: number;
+}): JSX.Element {
+  const [hovered, setHovered] = useState<number | null>(null);
+  const [containerRef, width] = useContainerWidth();
+  const n = balanceHistory.length;
+  // Use either credits or money for the points
+  const values = balanceHistory.map(b => showAs === 'credits' ? b.balance : +(b.balance * costPerCredit).toFixed(2));
+  const balanceMax = Math.max(...values);
+  const balanceMin = Math.min(...values);
+  const balanceRange = balanceMax - balanceMin || 1;
+  const labelInterval = Math.ceil(n / 10); // Show labels every 10th bar
+  // Smooth path
+  function getSmoothPath(points: number[][]): string {
+    if (points.length < 2) return '';
+    let d = `M${points[0][0]},${points[0][1]}`;
+    for (let i = 1; i < points.length; i++) {
+      const [x0, y0] = points[i - 1];
+      const [x1, y1] = points[i];
+      const cx = (x0 + x1) / 2;
+      d += ` Q${cx},${y0} ${x1},${y1}`;
+    }
+    return d;
+  }
+  const pointList: number[][] = values.map((value, i) => {
+    const x = (i + 0.5) * (width / n);
+    const y = height - ((value - balanceMin) / balanceRange) * (height - 64) - 16;
+    return [x, y];
+  });
+  const smoothPath = getSmoothPath(pointList);
+  return (
+    <div ref={containerRef} style={{ width: '100%' }}>
+      {width > 0 && (
+        <>
+          <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
+            {/* Grid lines */}
+            {[0.25, 0.5, 0.75].map((frac: number, i: number) => (
+              <line
+                key={i}
+                x1={0}
+                x2={width}
+                y1={height * frac}
+                y2={height * frac}
+                stroke="rgba(255,255,255,0.08)"
+                strokeWidth={1}
+              />
+            ))}
+            {/* Smooth curve */}
+            <path
+              d={smoothPath}
+              fill="none"
+              stroke={`url(#curve-gradient)`}
+              strokeWidth={3}
+              style={{ filter: 'drop-shadow(0 2px 12px #4ecdc488)' }}
+            />
+            {/* Points and tooltips */}
+            {pointList.map(([x, y]: number[], i: number) => (
+              <g key={i} onMouseEnter={() => setHovered(i)} onMouseLeave={() => setHovered(null)} style={{ cursor: 'pointer' }}>
+                <circle
+                  cx={x}
+                  cy={y}
+                  r={4}
+                  fill="#fff"
+                  stroke={accentGradient[0]}
+                  strokeWidth={2}
+                  style={{ filter: hovered === i ? 'drop-shadow(0 2px 8px #4ecdc488)' : 'none', transition: 'filter 0.2s' }}
+                />
+                {/* Data label (show on hover or always for mobile) */}
+                {(hovered === i) && (
+                  <foreignObject x={x - 24} y={y - 40} width={64} height={24} style={{ pointerEvents: 'none' }}>
+                    <div style={{ color: '#fff', fontSize: 14, fontWeight: 700, background: 'rgba(30,32,38,0.92)', borderRadius: 8, padding: '2px 0', textAlign: 'center', boxShadow: '0 2px 8px 0 rgba(0,0,0,0.12)' }}>
+                      {showAs === 'credits' ? values[i] : `$${values[i]}`}
+                    </div>
+                  </foreignObject>
+                )}
+              </g>
+            ))}
+            {/* Gradient for curve */}
+            <defs>
+              <linearGradient id="curve-gradient" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stopColor={accentGradient[0]} />
+                <stop offset="100%" stopColor={accentGradient[1]} />
+              </linearGradient>
+            </defs>
+          </svg>
+          {/* X-axis labels below the graph */}
+          <div
+            style={{
+              width: width,
+              minWidth: '100%',
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: 12,
+              color: 'rgba(255,255,255,0.5)',
+              marginTop: 32,
+              marginBottom: 0,
+              alignItems: 'flex-end',
+            }}
+          >
+            {balanceHistory.map((period: { date: string }, i: number) => (
+              <div
+                key={i}
+                style={{
+                  flex: 1,
+                  textAlign: 'center',
+                  height: n > 16 ? 48 : 'auto',
+                  display: 'flex',
+                  alignItems: 'flex-end',
+                  justifyContent: 'center',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {(i % labelInterval === 0 || i === n - 1) && (
+                  <span
+                    style={n > 16 ? {
+                      display: 'inline-block',
+                      transform: 'rotate(-45deg)',
+                      transformOrigin: 'top left',
+                      marginTop: 4,
+                      marginLeft: 2,
+                      marginRight: 2,
+                    } : {}}>
+                    {period.date}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

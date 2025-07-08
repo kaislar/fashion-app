@@ -36,15 +36,15 @@ const Landing: React.FC<{ isLoggedIn: boolean }> = ({ isLoggedIn }) => {
       <header style={{ background: 'rgba(10,10,10,0.65)', boxShadow: '0 2px 12px rgba(0,0,0,0.08)', position: 'fixed', top: 0, left: 0, right: 0, zIndex: 1000 }}>
         <nav className="container">
           <button className="logo" onClick={() => navigate('/')} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>VirtualFit</button>
+          <ul ref={mobileMenuRef} className={`nav-links ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+            <li><a href="#features" onClick={() => setMobileMenuOpen(false)}>Features</a></li>
+            <li><a href="#integration" onClick={() => setMobileMenuOpen(false)}>Integration</a></li>
+            <li><a href="#testimonials" onClick={() => setMobileMenuOpen(false)}>Testimonials</a></li>
+            <li><a href="#pricing" onClick={() => setMobileMenuOpen(false)}>Pricing</a></li>
+            <li><a href="/demo-store" onClick={() => setMobileMenuOpen(false)}>Demo Store</a></li>
+          </ul>
           {!isLoggedIn ? (
             <>
-              <ul ref={mobileMenuRef} className={`nav-links ${mobileMenuOpen ? 'mobile-open' : ''}`}>
-                <li><a href="#features" onClick={() => setMobileMenuOpen(false)}>Features</a></li>
-                <li><a href="#integration" onClick={() => setMobileMenuOpen(false)}>Integration</a></li>
-                <li><a href="#testimonials" onClick={() => setMobileMenuOpen(false)}>Testimonials</a></li>
-                <li><a href="#pricing" onClick={() => setMobileMenuOpen(false)}>Pricing</a></li>
-                <li><a href="/demo-store" onClick={() => setMobileMenuOpen(false)}>Demo Store</a></li>
-              </ul>
               <button className="cta-button" onClick={() => navigate('/login')}>Login</button>
               <button ref={hamburgerRef} className="mobile-menu-toggle" onClick={toggleMobileMenu}>
                 <span className={`hamburger ${mobileMenuOpen ? 'open' : ''}`}></span>
