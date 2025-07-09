@@ -33,7 +33,7 @@ const Login: React.FC<LoginProps> = ({ onBack, onGoToRegister, onLoginSuccess })
       }
       // Store the JWT token
       const data = await res.json();
-      login(data.access_token);
+      login(data.access_token, { email });
       setIsLoading(false);
       onLoginSuccess();
     } catch (err) {

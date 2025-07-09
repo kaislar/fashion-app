@@ -126,6 +126,8 @@ const Products: React.FC = () => {
     reader.readAsText(file);
   };
 
+  const getImageUrl = (url: string) => url.startsWith('http') ? url : `${API_CONFIG.BASE_URL}${url}`;
+
   return (
     <>
       <div style={{
@@ -338,11 +340,11 @@ const Products: React.FC = () => {
                     <div style={{ marginBottom: 12.8 }}>
                       {product.images && product.images.length > 0 ? (
                         <img
-                          src={`${API_CONFIG.BASE_URL}/images/${product.images[0]}`}
+                          src={getImageUrl(product.images[0])}
                           alt={product.name}
                           style={{ width: '100%', height: 160, objectFit: 'cover', borderRadius: 12.8, border: '1.2px solid #fff', cursor: 'pointer' }}
                           onClick={() => {
-                            setGalleryImages(product.images.map(img => `${API_CONFIG.BASE_URL}${img}`));
+                            setGalleryImages(product.images.map(getImageUrl));
                             setGalleryIndex(0);
                             setGalleryOpen(true);
                           }}
@@ -634,7 +636,7 @@ const ProductModal: React.FC<{
 
   const API_BASE = process.env.REACT_APP_BACK_API_URL || '';
   const getImageUrl = (url: string) =>
-    url.startsWith('http') ? url : `${API_BASE}/api${url}`;
+    url.startsWith('http') || url.startsWith('blob:') ? url : `${API_BASE}/api${url}`;
 
   return (
     <div style={{

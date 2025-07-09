@@ -249,36 +249,21 @@ def get_embed_code(db: Session = Depends(get_db), current_user: UserDB = Depends
     if not config:
         raise HTTPException(status_code=404, detail="Widget configuration not found")
 
-    # Generate API key (in a real app, this would be stored and retrieved)
-    api_key = f"vf_{current_user.id[:8]}_{uuid.uuid4().hex[:16]}"
+    # Use existing API key or generate and store a new one
+    if not config.api_key:
+        config.api_key = generate_api_key(current_user.id)
+        db.commit()
+        db.refresh(config)
 
-    embed_code = f"""<script src="https://cdn.virtualfit.com/widget.js"></script>
+    api_key = config.api_key
+
+    front_url = os.environ.get("FRONT_END_URL")
+    script_src = f"{front_url.rstrip('/') if front_url else 'https://cdn.virtualfit.com'}/virtual-tryon-widget.min.js"
+    embed_code = f"""<script src=\"{script_src}\"></script>
 <script>
-  VirtualFit.init({{
+  VirtualTryOnWidget.init({{
     apiKey: '{api_key}',
-    config: {{
-      primaryColor: '{config.primary_color}',
-      secondaryColor: '{config.secondary_color}',
-      backgroundColor: '{config.background_color}',
-      textColor: '{config.text_color}',
-      fontFamily: '{config.font_family}',
-      fontSize: '{config.font_size}',
-      fontWeight: '{config.font_weight}',
-      buttonStyle: '{config.button_style}',
-      buttonSize: '{config.button_size}',
-      buttonText: '{config.button_text}',
-      widgetSize: '{config.widget_size}',
-      position: '{config.position}',
-      title: '{config.title}',
-      subtitle: '{config.subtitle}',
-      callToAction: '{config.call_to_action}',
-      showBranding: {config.show_branding.lower() == "true"},
-      enableAR: {config.enable_ar.lower() == "true"},
-      enableSharing: {config.enable_sharing.lower() == "true"},
-      animationType: '{config.animation_type}',
-      animationSpeed: '{config.animation_speed}'
-    }},
-    container: '#virtual-try-on-widget'
+    productId: 'YOUR_PRODUCT_ID'
   }});
 </script>"""
 
@@ -520,12 +505,13 @@ def create_stripe_checkout_session(
         line_items=[
             {
                 "price_data": {
-                    "currency": "usd",
+                    "currency": "eur",
                     "product_data": {
                         "name": f"{credits} Credits",
                         "description": f"Purchase of {credits} credits",
                     },
                     "unit_amount": amount_cents,
+                    "tax_behavior": "inclusive",
                 },
                 "quantity": 1,
             }
@@ -535,6 +521,9 @@ def create_stripe_checkout_session(
         cancel_url=cancel_url,
         payment_intent_data={"description": f"Purchase of {credits} credits"},
         metadata={"username": current_user.username, "credits": credits, "amount": amount},
+        automatic_tax={"enabled": True},
+        billing_address_collection="required",
+        customer_update={"address": "auto"},
     )
     # Store mapping for webhook
     stripe_sessions[session.id] = {

@@ -506,54 +506,56 @@ const SubscriptionPage: React.FC = () => {
                           padding: '4px 16px',
                           borderRadius: 12,
                           fontSize: 12,
-                          fontWeight: 600
+                          fontWeight: 600,
+                          zIndex: 2,
                         }}>
                           MOST POPULAR
                         </div>
                       )}
-
-                      <h4 style={{ color: 'white', marginBottom: 8, fontSize: 20, fontWeight: 600 }}>
+                      {pkg.originalPrice && (
+                        <div style={{
+                          position: 'absolute',
+                          top: -12,
+                          right: 12,
+                          background: '#ffd93d',
+                          color: '#333',
+                          padding: '4px 12px',
+                          borderRadius: 12,
+                          fontSize: 12,
+                          fontWeight: 600,
+                          zIndex: 2,
+                        }}>
+                          Save {Math.round(100 - (pkg.price / pkg.originalPrice) * 100)}%
+                        </div>
+                      )}
+                      <h4 style={{ color: 'white', marginBottom: 8, fontSize: 20, fontWeight: 600, textAlign: 'center' }}>
                         {pkg.name}
                       </h4>
-
-                      <div style={{ marginBottom: 16 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <span style={{ fontSize: 32, fontWeight: 700, color: '#4ecdc4' }}>
-                          ${pkg.price}
+                          €{pkg.price}
                         </span>
                         {pkg.originalPrice && (
-                          <span style={{
-                            fontSize: 18,
-                            color: 'rgba(255,255,255,0.5)',
-                            textDecoration: 'line-through',
-                            marginLeft: 8
-                          }}>
-                            ${pkg.originalPrice}
+                          <span style={{ fontSize: 18, color: 'rgba(255,255,255,0.5)', textDecoration: 'line-through', marginLeft: 8 }}>
+                            €{pkg.originalPrice}
                           </span>
                         )}
                       </div>
-
-                      <div style={{ marginBottom: 24 }}>
-                        <div style={{ fontSize: 24, fontWeight: 700, color: 'white', marginBottom: 4 }}>
-                          {pkg.credits.toLocaleString()} Credits
-                        </div>
-                        <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14 }}>
-                          ${(pkg.price / pkg.credits).toFixed(2)} per credit
-                        </div>
+                      <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 14, marginTop: 4 }}>
                       </div>
-
-                      <ul style={{ marginBottom: 24, paddingLeft: 20 }}>
-                        {pkg.features.map((feature, index) => (
-                          <li key={index} style={{
-                            color: 'rgba(255,255,255,0.8)',
-                            marginBottom: 8,
-                            fontSize: 14
-                          }}>
-                            {feature}
-                          </li>
-                        ))}
-                      </ul>
-
+                      <div style={{ marginTop: 12, marginBottom: 12 }}>
+                        <ul style={{ paddingLeft: 20, margin: 0 }}>
+                          {pkg.features.map((feature, index) => (
+                            <li key={index} style={{ color: '#4ecdc4', fontWeight: 500, fontSize: 14, marginBottom: 4, listStyle: 'none', display: 'flex', alignItems: 'center' }}>
+                              <span style={{ marginRight: 8 }}>✔️</span> <span style={{ color: 'white' }}>{feature}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                       <div style={{ marginTop: 'auto' }}>
+                        <div style={{ color: '#ffd93d', fontSize: 13, fontWeight: 600, marginBottom: 8, textAlign: 'center' }}>
+                          Good for up to {pkg.credits} generations
+                        </div>
                         <button
                           onClick={() => handleStripePurchase(pkg)}
                           style={{
@@ -575,6 +577,47 @@ const SubscriptionPage: React.FC = () => {
                       </div>
                     </div>
                   ))}
+                </div>
+                <div style={{ color: 'rgba(255,255,255,0.7)', fontSize: 15, marginTop: 12, marginBottom: 32, textAlign: 'center' }}>
+                  All prices include VAT. The final amount will be calculated at checkout based on your location.
+                </div>
+                <h3 style={{ color: 'white', marginBottom: 24, fontSize: 24, fontWeight: 600, textAlign: 'left' }}>
+                  FAQ
+                </h3>
+                <div style={{
+                  background: 'rgba(255,255,255,0.07)',
+                  borderRadius: 20,
+                  border: '1.5px solid rgba(255,255,255,0.13)',
+                  boxShadow: '0 2px 16px 0 rgba(76,205,196,0.07)',
+                  padding: 32,
+                  marginBottom: 32,
+                  width: '100%',
+                  position: 'relative',
+                }}>
+                  <details style={{ marginBottom: 12 }}>
+                    <summary style={{ fontWeight: 600, fontSize: 16, color: '#4ecdc4', cursor: 'pointer' }}>What are credits?</summary>
+                    <div style={{ color: 'white', fontSize: 14, marginTop: 8 }}>
+                      Credits are the currency used to access AI features. Each generation or action consumes a certain number of credits.
+                    </div>
+                  </details>
+                  <details style={{ marginBottom: 12 }}>
+                    <summary style={{ fontWeight: 600, fontSize: 16, color: '#4ecdc4', cursor: 'pointer' }}>How do I use credits?</summary>
+                    <div style={{ color: 'white', fontSize: 14, marginTop: 8 }}>
+                      When you use the app’s AI features (e.g., generate images, chat), credits are automatically deducted from your balance.
+                    </div>
+                  </details>
+                  <details style={{ marginBottom: 12 }}>
+                    <summary style={{ fontWeight: 600, fontSize: 16, color: '#4ecdc4', cursor: 'pointer' }}>Do credits expire?</summary>
+                    <div style={{ color: 'white', fontSize: 14, marginTop: 8 }}>
+                      No, credits do not expire as long as your account is active.
+                    </div>
+                  </details>
+                  <details>
+                    <summary style={{ fontWeight: 600, fontSize: 16, color: '#4ecdc4', cursor: 'pointer' }}>How is VAT calculated?</summary>
+                    <div style={{ color: 'white', fontSize: 14, marginTop: 8 }}>
+                      VAT is calculated automatically at checkout based on your billing address and local regulations.
+                    </div>
+                  </details>
                 </div>
               </div>
             )}
@@ -1027,7 +1070,7 @@ function UsageBarChart({ usageHistory, period, height, accentGradient, showAs = 
             style={{
               position: 'absolute',
               left: 0,
-              bottom: 0,
+              bottom: -35, // add extra space below the bars
               width: width,
               minWidth: '100%',
               display: 'flex',
@@ -1036,6 +1079,7 @@ function UsageBarChart({ usageHistory, period, height, accentGradient, showAs = 
               color: 'rgba(255,255,255,0.5)',
               zIndex: 3,
               alignItems: 'flex-end',
+              marginBottom: 16, // extra margin for spacing
             }}
           >
             {usageHistory.map((period: { date: string }, i: number) => (

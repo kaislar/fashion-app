@@ -8,7 +8,12 @@ const DashboardLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const navigate = useNavigate();
   const location = useLocation();
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
 
   const getActivePage = () => {
     if (location.pathname.startsWith('/dashboard')) return 'dashboard';
@@ -32,11 +37,14 @@ const DashboardLayout: React.FC = () => {
         isLoggedIn={true}
         onLogoClick={() => navigate('/')}
         onLoginClick={() => navigate('/login')}
+        onLogout={handleLogout}
+        user={user}
       />
       <Sidebar
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
         onNavigate={handleSidebarNav}
+        onLogout={handleLogout}
       />
       <div
         style={{

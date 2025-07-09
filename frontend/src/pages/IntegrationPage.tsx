@@ -5,41 +5,55 @@ import { api } from '../config/apiConfig';
 const IntegrationPage: React.FC = () => {
   const { token } = useAuth();
   const [apiKey, setApiKey] = useState<string>('');
+  const [embedCode, setEmbedCode] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const fetchApiKey = async () => {
+    const fetchData = async () => {
       if (!token) return;
       setIsLoading(true);
       try {
-        const res = await api.getWidgetConfig(token);
-        if (res.ok) {
-          const data = await res.json();
-          setApiKey(data.api_key);
+        // Fetch API key
+        const apiKeyRes = await api.getWidgetConfig(token);
+        if (apiKeyRes.ok) {
+          const apiKeyData = await apiKeyRes.json();
+          setApiKey(apiKeyData.api_key);
+        }
+
+        // Fetch embed code
+        const embedRes = await api.getWidgetEmbedCode(token);
+        if (embedRes.ok) {
+          const embedData = await embedRes.json();
+          setEmbedCode(embedData.embed_code);
         }
       } finally {
         setIsLoading(false);
       }
     };
-    fetchApiKey();
+    fetchData();
   }, [token]);
 
   const handleRegenerate = async () => {
     if (!token) return;
     setIsLoading(true);
     try {
+      // Regenerate API key
       const res = await api.regenerateApiKey(token);
       if (res.ok) {
         const data = await res.json();
         setApiKey(data.api_key);
+
+        // Fetch updated embed code with new API key
+        const embedRes = await api.getWidgetEmbedCode(token);
+        if (embedRes.ok) {
+          const embedData = await embedRes.json();
+          setEmbedCode(embedData.embed_code);
+        }
       }
     } finally {
       setIsLoading(false);
     }
   };
-
-  // Embed code with only API key and product ID placeholder
-  const embedCode = `<script src="https://cdn.virtualfit.com/widget.js"></script>\n<script>\n  VirtualTryOnWidget.init({\n    apiKey: '${apiKey}',\n    productId: 'YOUR_PRODUCT_ID'\n  });\n</script>`;
 
   return (
     <div style={{

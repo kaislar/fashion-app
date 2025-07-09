@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { api } from './config/apiConfig';
+import { useAuth } from './AuthContext';
 
 interface RegisterProps {
   onBack: () => void;
@@ -8,6 +9,7 @@ interface RegisterProps {
 }
 
 const Register: React.FC<RegisterProps> = ({ onBack, onGoToLogin, onRegisterSuccess }) => {
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -30,6 +32,19 @@ const Register: React.FC<RegisterProps> = ({ onBack, onGoToLogin, onRegisterSucc
         setIsLoading(false);
         return;
       }
+      // Automatically log in after successful registration
+      const formData = new FormData();
+      formData.append('username', email);
+      formData.append('password', password);
+      const loginRes = await api.login(formData);
+      if (!loginRes.ok) {
+        setError('Registration succeeded, but login failed. Please sign in.');
+        setIsLoading(false);
+        onRegisterSuccess();
+        return;
+      }
+      const loginData = await loginRes.json();
+      login(loginData.access_token, { email });
       setIsLoading(false);
       onRegisterSuccess();
     } catch (err) {

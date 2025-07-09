@@ -75,7 +75,7 @@ const DemoStorePage: React.FC<{ isLoggedIn?: boolean }> = ({ isLoggedIn = false 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [apiKey, setApiKey] = useState<string | null>('vf_3a596216_d75b4c42117b4a22'); // Fake API key
+  const [apiKey, setApiKey] = useState<string | null>(process.env.REACT_APP_API_KEY || '');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [showWidget, setShowWidget] = useState(false);
 
@@ -142,7 +142,9 @@ const DemoStorePage: React.FC<{ isLoggedIn?: boolean }> = ({ isLoggedIn = false 
   useEffect(() => {
     const loadWidgetScript = () => {
       const script = document.createElement('script');
-      script.src = '/virtual-tryon-widget.min.js';
+      // Use the same logic as the backend embed code
+      const frontUrl = process.env.REACT_APP_FRONT_URL || window.location.origin;
+      script.src = `${frontUrl}/virtual-tryon-widget.min.js`;
       script.async = true;
       script.onload = () => {
         console.log('Virtual try-on widget loaded successfully');
@@ -154,7 +156,8 @@ const DemoStorePage: React.FC<{ isLoggedIn?: boolean }> = ({ isLoggedIn = false 
     };
 
     // Check if script is already loaded
-    if (!document.querySelector('script[src="/virtual-tryon-widget.min.js"]')) {
+    const scriptSrc = `${process.env.REACT_APP_FRONT_URL || window.location.origin}/virtual-tryon-widget.min.js`;
+    if (!document.querySelector(`script[src="${scriptSrc}"]`)) {
       loadWidgetScript();
     }
   }, []);
