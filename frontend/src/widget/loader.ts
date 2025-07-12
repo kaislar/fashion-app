@@ -2,6 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom';
 import VirtualTryOnWidget from './VirtualTryOnWidget';
 import { defaultWidgetConfig } from './defaultWidgetConfig';
+import { getApiBaseUrl } from './apiUtils';
 
 interface WidgetConfig {
   apiKey: string;
@@ -35,12 +36,6 @@ class VirtualTryOnWidgetLoader {
     `;
 
     return container;
-  }
-
-  private getApiBaseUrl(): string {
-    const url = process.env.REACT_APP_BACK_API_URL;
-    if (!url) throw new Error('REACT_APP_BACK_API_URL environment variable is not set');
-    return url;
   }
 
   public async init(): Promise<void> {
@@ -114,7 +109,7 @@ class VirtualTryOnWidgetLoader {
     let fullConfig = { ...defaultWidgetConfig };
     try {
       // Use the same base URL as the demo page
-      const BASE_API_URL = this.getApiBaseUrl();
+      const BASE_API_URL = getApiBaseUrl();
       const resp = await fetch(`${BASE_API_URL}/api/widget/config-by-api-key?api_key=${encodeURIComponent(this.config.apiKey)}`);
       if (resp.ok) {
         const data = await resp.json();

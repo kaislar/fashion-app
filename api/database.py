@@ -27,7 +27,7 @@ class ProductDB(Base):
     price = Column(Float, nullable=True)
     page_url = Column(String, nullable=True)
     category = Column(String, nullable=True)
-    images = Column(String, nullable=True)  # Comma-separated URLs
+    images = Column(String, nullable=True)  # JSON array of image URLs or comma-separated (legacy)
 
 
 class WidgetConfigDB(Base):
@@ -59,6 +59,18 @@ class CreditPurchaseDB(Base):
     description = Column(String, nullable=True)
     status = Column(String, nullable=True)
     download_url = Column(String, nullable=True)
+
+
+class WidgetAnalyticsEventDB(Base):
+    __tablename__ = "widget_analytics_events"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    client_id = Column(String, nullable=False)
+    event = Column(String, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    product_id = Column(String, nullable=True)
+    event_data = Column(JSON, nullable=True)  # Renamed from 'metadata'
+    visitor_id = Column(String, nullable=True)
+    session_visitor_id = Column(String, nullable=True)
 
 
 Base.metadata.create_all(bind=engine)

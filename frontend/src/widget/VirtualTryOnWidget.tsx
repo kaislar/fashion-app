@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { defaultWidgetConfig } from './defaultWidgetConfig';
 import type { WidgetConfig } from '../WidgetCustomization';
+import { trackEvent, WidgetAnalyticsEvents } from './trackEvents';
+import { getApiBaseUrl } from './apiUtils';
 
 export interface VirtualTryOnWidgetProps {
   apiKey?: string;
@@ -18,12 +20,6 @@ interface Product {
   images: string[];
   category: string;
 }
-
-const getApiBaseUrl = () => {
-  const url = process.env.REACT_APP_BACK_API_URL;
-  if (!url) throw new Error('REACT_APP_BACK_API_URL environment variable is not set');
-  return url;
-};
 
 const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
   apiKey = '',
@@ -408,6 +404,18 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
     }
   }, [apiKey, productId, previewMode, config]);
 
+  // Track widget opened on mount
+  useEffect(() => {
+    trackEvent(WidgetAnalyticsEvents.WIDGET_OPENED, { productId, previewMode, apiKey });
+  }, []);
+
+  // Track product viewed when product is loaded
+  useEffect(() => {
+    if (product) {
+      trackEvent(WidgetAnalyticsEvents.PRODUCT_VIEWED, { productId: product.id, name: product.name, apiKey });
+    }
+  }, [product]);
+
   // Clean up camera when step changes away from photo
   useEffect(() => {
     if (step !== 'photo' && isWebcamActive) {
@@ -436,11 +444,13 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
     if (isWebcamActive) {
       stopWebcam();
     }
+    trackEvent(WidgetAnalyticsEvents.WIDGET_CLOSED, { productId: product?.id, apiKey });
     onClose?.();
   };
 
   // Webcam handling
   const startWebcam = async () => {
+    trackEvent(WidgetAnalyticsEvents.PHOTO_CAPTURE_STARTED, { productId: product?.id, apiKey });
     if (!videoRef.current) {
       setError('Video element not found');
       return;
@@ -530,11 +540,13 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
         setPhoto(photoData);
         stopWebcam();
         setStep('preview');
+        trackEvent(WidgetAnalyticsEvents.PHOTO_CAPTURED, { productId: product?.id, apiKey });
       }
     }
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    trackEvent(WidgetAnalyticsEvents.PHOTO_UPLOAD_STARTED, { productId: product?.id, apiKey });
     const file = event.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -542,12 +554,14 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
         const photoData = e.target?.result as string;
         setPhoto(photoData);
         setStep('preview');
+        trackEvent(WidgetAnalyticsEvents.PHOTO_UPLOADED, { productId: product?.id, apiKey });
       };
       reader.readAsDataURL(file);
     }
   };
 
   const processTryOn = async (photoData: string) => {
+    trackEvent(WidgetAnalyticsEvents.TRYON_GENERATION_STARTED, { productId: product?.id, apiKey });
     setIsGenerating(true);
     setError(null);
     setShowLongWaitTip(false);
@@ -579,9 +593,11 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
       setResult(resultData.resultImage || resultData.image);
       setStep('result');
       onTryOnComplete?.(resultData);
+      trackEvent(WidgetAnalyticsEvents.TRYON_GENERATION_SUCCESS, { productId: product?.id, apiKey });
     } catch (err) {
       setError('Failed to generate virtual try-on image');
       setStep('preview');
+      trackEvent(WidgetAnalyticsEvents.TRYON_GENERATION_FAILED, { productId: product?.id, error: err instanceof Error ? err.message : String(err), apiKey });
     } finally {
       setIsGenerating(false);
       clearTimeout(tipTimeout);
@@ -590,6 +606,7 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
   };
 
   const resetWidget = () => {
+    trackEvent(WidgetAnalyticsEvents.TRY_AGAIN_CLICKED, { productId: product?.id, apiKey });
     setPhoto(null);
     setResult(null);
     setError(null);
@@ -600,6 +617,13 @@ const VirtualTryOnWidget: React.FC<VirtualTryOnWidgetProps> = ({
     }
     setStep('photo');
   };
+
+  // Track error events globally (optional, for unexpected errors)
+  useEffect(() => {
+    if (error) {
+      trackEvent(WidgetAnalyticsEvents.ERROR_EVENT, { productId: product?.id, error, apiKey });
+    }
+  }, [error]);
 
   const renderLoading = () => (
     <div style={modalStyle}>

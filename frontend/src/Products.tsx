@@ -40,6 +40,7 @@ const Products: React.FC = () => {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [importStep, setImportStep] = useState(1);
   const [selectedImportMethod, setSelectedImportMethod] = useState<string>('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Filtered and paginated products
   const filtered = useMemo(() =>
@@ -89,10 +90,24 @@ const Products: React.FC = () => {
   }, [token]);
 
   // Delete product
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deleteId !== null) {
-      setProducts(ps => ps.filter(p => p.id !== deleteId));
-      setDeleteId(null);
+      setIsDeleting(true);
+      try {
+        const res = await api.deleteProduct(deleteId, token || undefined);
+        if (!res.ok) {
+          const data = await res.json();
+          alert(data.detail || 'Failed to delete product');
+          return;
+        }
+        // Remove from local state
+        setProducts(ps => ps.filter(p => p.id !== deleteId));
+        setDeleteId(null);
+      } catch (err) {
+        alert('Network error. Could not delete product.');
+      } finally {
+        setIsDeleting(false);
+      }
     }
   };
 
@@ -126,7 +141,13 @@ const Products: React.FC = () => {
     reader.readAsText(file);
   };
 
-  const getImageUrl = (url: string) => url.startsWith('http') ? url : `${API_CONFIG.BASE_URL}${url}`;
+  const getImageUrl = (url: string) => {
+    // Filter out blob URLs and invalid URLs
+    if (url.startsWith('blob:') || url.startsWith('data:')) {
+      return ''; // Return empty string for invalid URLs
+    }
+    return url.startsWith('http') ? url : `${API_CONFIG.BASE_URL}${url}`;
+  };
 
   return (
     <>
@@ -261,15 +282,18 @@ const Products: React.FC = () => {
                     {paginated.map(product => (
                       <tr key={product.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.08)', fontSize: 12.8 }}>
                         <td style={{ padding: '12.8px 9.6px' }}>
-                          {product.images && product.images.length > 0 ? (
+                          {product.images && product.images.length > 0 && getImageUrl(product.images[0]) ? (
                             <img
-                              src={`${API_CONFIG.BASE_URL}${product.images[0]}`}
+                              src={getImageUrl(product.images[0])}
                               alt="thumb"
                               style={{ width: 44.8, height: 44.8, objectFit: 'cover', borderRadius: 6.4, border: '1.2px solid #fff', cursor: 'pointer' }}
                               onClick={() => {
-                                setGalleryImages(product.images.map(img => `${API_CONFIG.BASE_URL}${img}`));
-                                setGalleryIndex(0);
-                                setGalleryOpen(true);
+                                const validImages = product.images.map(getImageUrl).filter(url => url);
+                                if (validImages.length > 0) {
+                                  setGalleryImages(validImages);
+                                  setGalleryIndex(0);
+                                  setGalleryOpen(true);
+                                }
                               }}
                             />
                           ) : (
@@ -338,15 +362,18 @@ const Products: React.FC = () => {
                     transition: 'all 0.3s ease',
                   }}>
                     <div style={{ marginBottom: 12.8 }}>
-                      {product.images && product.images.length > 0 ? (
+                      {product.images && product.images.length > 0 && getImageUrl(product.images[0]) ? (
                         <img
                           src={getImageUrl(product.images[0])}
                           alt={product.name}
                           style={{ width: '100%', height: 160, objectFit: 'cover', borderRadius: 12.8, border: '1.2px solid #fff', cursor: 'pointer' }}
                           onClick={() => {
-                            setGalleryImages(product.images.map(getImageUrl));
-                            setGalleryIndex(0);
-                            setGalleryOpen(true);
+                            const validImages = product.images.map(getImageUrl).filter(url => url);
+                            if (validImages.length > 0) {
+                              setGalleryImages(validImages);
+                              setGalleryIndex(0);
+                              setGalleryOpen(true);
+                            }
                           }}
                         />
                       ) : (
@@ -448,6 +475,7 @@ const Products: React.FC = () => {
           product={editing}
           onClose={() => { setModalOpen(false); setEditing(null); }}
           onSave={handleSave}
+          onRefresh={fetchProducts}
         />
       )}
 
@@ -468,8 +496,10 @@ const Products: React.FC = () => {
             <h3 style={{ fontWeight: 700, fontSize: 16, marginBottom: 12.8 }}>Delete Product</h3>
             <p style={{ color: '#bfcfff', marginBottom: 19.2 }}>Are you sure you want to delete this product? This action cannot be undone.</p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 9.6 }}>
-              <button className="btn-secondary" onClick={() => setDeleteId(null)}>Cancel</button>
-              <button className="btn-primary" onClick={handleDelete}>Delete</button>
+              <button className="btn-secondary" onClick={() => setDeleteId(null)} disabled={isDeleting}>Cancel</button>
+              <button className="btn-primary" onClick={handleDelete} disabled={isDeleting}>
+                {isDeleting ? 'Deleting...' : 'Delete'}
+              </button>
             </div>
           </div>
         </div>
@@ -554,7 +584,8 @@ const ProductModal: React.FC<{
   product: Product | null;
   onClose: () => void;
   onSave: (p: Omit<Product, 'id'>) => void;
-}> = ({ product, onClose, onSave }) => {
+  onRefresh?: () => Promise<void>;
+}> = ({ product, onClose, onSave, onRefresh }) => {
   const { token } = useAuth();
   const [name, setName] = useState(product?.name || '');
   const [sku, setSku] = useState(product?.sku || '');
@@ -562,7 +593,8 @@ const ProductModal: React.FC<{
   const [page_url, setPageUrl] = useState(product?.page_url || '');
   const [category, setCategory] = useState(product?.category || '');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  // Always use product.images (URLs) for initial preview in edit mode
+  // Track existing images (URLs) and new files separately
+  const [existingImages, setExistingImages] = useState<string[]>(product?.images || []);
   const [previewUrls, setPreviewUrls] = useState<string[]>(product?.images || []);
   const [error, setError] = useState('');
 
@@ -579,13 +611,31 @@ const ProductModal: React.FC<{
   };
 
   const handleRemoveImage = (idx: number) => {
-    setSelectedFiles(prev => prev.filter((_, i) => i !== idx));
+    // Determine if this is an existing image or a new file
+    const isExistingImage = idx < existingImages.length;
+
+    if (isExistingImage) {
+      // Remove from existing images
+      setExistingImages(prev => prev.filter((_, i) => i !== idx));
+    } else {
+      // Remove from selected files (adjust index for new files)
+      const fileIndex = idx - existingImages.length;
+      setSelectedFiles(prev => prev.filter((_, i) => i !== fileIndex));
+    }
+
+    // Remove from preview URLs
     setPreviewUrls(prev => prev.filter((_, i) => i !== idx));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !sku.trim() || (!product && selectedFiles.length === 0)) {
+      setError('Product Name, SKU, and at least one image are required.');
+      return;
+    }
+
+    // For edit mode, check if we have at least one image (existing or new)
+    if (product && existingImages.length === 0 && selectedFiles.length === 0) {
       setError('Product Name, SKU, and at least one image are required.');
       return;
     }
@@ -604,9 +654,17 @@ const ProductModal: React.FC<{
       if (productData.price) formData.append('price', productData.price.toString());
       if (productData.page_url) formData.append('page_url', productData.page_url);
       if (productData.category) formData.append('category', productData.category);
+
+      // Add new files
       selectedFiles.forEach((file) => {
         formData.append('images', file);
       });
+
+      // Add existing image URLs for edit mode
+      if (product && existingImages.length > 0) {
+        formData.append('existing_images', JSON.stringify(existingImages));
+      }
+
       if (product) {
         // Edit mode: use PUT endpoint
         res = await fetch(`${API_CONFIG.BASE_URL}/products/${product.id}`, {
@@ -624,10 +682,20 @@ const ProductModal: React.FC<{
         return;
       }
       const data = await res.json();
-      onSave({
-        ...productData,
-        images: previewUrls // Use preview URLs for immediate display
-      });
+
+      // For edit mode, we need to refresh the product list to get the updated data
+      if (product) {
+        // Refresh the product list to get the updated data from backend
+        if (onRefresh) {
+          await onRefresh();
+        }
+      } else {
+        // For new products, use the preview URLs for immediate display
+        onSave({
+          ...productData,
+          images: previewUrls
+        });
+      }
       onClose();
     } catch (err) {
       alert(product ? 'Network error. Could not update product.' : 'Network error. Could not add product.');

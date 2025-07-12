@@ -15,6 +15,7 @@ import IntegrationPage from './pages/IntegrationPage';
 import SubscriptionPage from './pages/SubscriptionPage';
 import Landing from './Landing';
 import DemoStorePage from './pages/DemoStorePage';
+import AnalyticsPage from './pages/AnalyticsPage';
 
 
 const AppContent: React.FC = () => {
@@ -54,6 +55,9 @@ const AppContent: React.FC = () => {
         <Route path="/register" element={<RegisterWithNav />} />
         <Route path="/dashboard" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
           <Route index element={<DashboardPage />} />
+        </Route>
+        <Route path="/analytics" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
+          <Route index element={<AnalyticsPage />} />
         </Route>
         <Route path="/products" element={<ProtectedRoute><DashboardLayout /></ProtectedRoute>}>
           <Route index element={<ProductsPage />} />

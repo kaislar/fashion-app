@@ -1,12 +1,6 @@
-// API Configuration
-const getApiBaseUrl = () => {
-  const url = process.env.REACT_APP_BACK_API_URL;
-  if (!url) {
-    throw new Error('REACT_APP_BACK_API_URL environment variable is not set');
-  }
-  return url;
-};
+import { getApiBaseUrl } from '../widget/apiUtils';
 
+// Use getApiBaseUrl for BASE_URL.
 export const API_CONFIG = {
   // Base URL for API endpoints
   BASE_URL: getApiBaseUrl() + '/api',
@@ -123,6 +117,10 @@ export const api = {
   addProduct: (formData: FormData, token?: string) => fetch(`${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.ADD_PRODUCT}`, { method: 'POST', body: formData, headers: token ? { Authorization: `Bearer ${token}` } : {} }),
   addProductWithImages: (productData: any, images: File[], token?: string) =>
     addProductWithImages(productData, images, token),
+  deleteProduct: (productId: string, token?: string) => fetch(`${API_CONFIG.BASE_URL}/products/${productId}`, {
+    method: 'DELETE',
+    headers: token ? { Authorization: `Bearer ${token}` } : {}
+  }),
 
   // Image endpoints
   getAuthenticatedImageUrl: (imagePath: string, token?: string) =>

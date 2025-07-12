@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../config/apiConfig';
 import DemoGuideChatbot from '../components/DemoGuideChatbot';
+import { getApiBaseUrl } from '../widget/apiUtils';
 
 // Widget types are now defined in types/widget.d.ts
 
@@ -63,12 +64,6 @@ const guideSteps: GuideStep[] = [
     action: 'Ready to try it?'
   }
 ];
-
-const getApiBaseUrl = () => {
-  const url = process.env.REACT_APP_BACK_API_URL;
-  if (!url) throw new Error('REACT_APP_BACK_API_URL environment variable is not set');
-  return url;
-};
 
 const DemoStorePage: React.FC<{ isLoggedIn?: boolean }> = ({ isLoggedIn = false }) => {
   const navigate = useNavigate();

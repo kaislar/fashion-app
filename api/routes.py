@@ -14,7 +14,15 @@ from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from schemas import User, Token, CreditBalance, CreditInvoice
-from database import UserDB, ProductDB, WidgetConfigDB, UsageLogDB, CreditPurchaseDB
+from database import (
+    UserDB,
+    ProductDB,
+    WidgetConfigDB,
+    UsageLogDB,
+    CreditPurchaseDB,
+    WidgetAnalyticsEventDB,
+    SessionLocal,
+)
 from auth import (
     get_db,
     get_password_hash,
@@ -32,10 +40,50 @@ import shutil
 from typing import List, Optional
 import asyncio
 import stripe
+import json
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+from sqlalchemy import func
+from dateutil.parser import isoparse
+import pandas as pd
+import io
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "your-secret-key")
+
+def parse_images_field(images_field):
+    """Safely parse images field that could be JSON array, comma-separated string, or single string."""
+    if not images_field:
+        return []
+
+    if isinstance(images_field, list):
+        return images_field
+
+    if isinstance(images_field, str):
+        # Try to parse as JSON first
+        try:
+            parsed = json.loads(images_field)
+            if isinstance(parsed, list):
+                return parsed
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+        # Fall back to comma-separated format
+        if "," in images_field:
+            return [img.strip() for img in images_field.split(",") if img.strip()]
+        elif images_field.strip():
+            # Single image URL as string
+            return [images_field.strip()]
+
+    return []
+
+
+def store_images_field(image_urls):
+    """Store image URLs as JSON array, ensuring consistent format."""
+    if not image_urls:
+        return None
+    return json.dumps(image_urls)
+
+
+SECRET_KEY = os.environ.get("FAST_API_SECRET_KEY", "your-secret-key")
 ALGORITHM = "HS256"
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
 
@@ -167,7 +215,7 @@ async def add_product(
         price=price,
         page_url=page_url,
         category=category,
-        images=",".join(image_urls) if image_urls else None,
+        images=store_images_field(image_urls),
     )
     db.add(db_product)
     db.commit()
@@ -188,7 +236,7 @@ def list_products(db: Session = Depends(get_db), current_user: UserDB = Depends(
                 "price": p.price,
                 "page_url": p.page_url,
                 "category": p.category,
-                "images": p.images.split(",") if p.images else [],
+                "images": parse_images_field(p.images),
             }
         )
     return result
@@ -335,7 +383,7 @@ def get_product_by_api_key(api_key: str, product_id: str, db: Session = Depends(
         "price": product.price,
         "page_url": product.page_url,
         "category": product.category,
-        "images": product.images.split(",") if product.images else [],
+        "images": parse_images_field(product.images),
     }
 
 
@@ -355,7 +403,7 @@ def get_first_user_products(db: Session = Depends(get_db)):
             "price": p.price,
             "page_url": p.page_url,
             "category": p.category,
-            "images": p.images.split(",") if p.images else [],
+            "images": parse_images_field(p.images),
         }
         for p in products
     ]
@@ -371,6 +419,7 @@ async def update_product(
     page_url: Optional[str] = Form(None),
     category: Optional[str] = Form(None),
     images: List[UploadFile] = File([]),
+    existing_images: Optional[str] = Form(None),
     db: Session = Depends(get_db),
     current_user: UserDB = Depends(get_current_user),
 ):
@@ -390,15 +439,84 @@ async def update_product(
         .first()
     ):
         raise HTTPException(status_code=400, detail="SKU already exists")
+
+    # Parse existing images if provided
+    existing_image_urls = []
+    if existing_images:
+        try:
+            existing_image_urls = json.loads(existing_images)
+        except (json.JSONDecodeError, TypeError):
+            # Fallback to empty list if JSON parsing fails
+            existing_image_urls = []
+
     # Save uploaded images
-    image_urls = []
+    new_image_urls = []
     for image in images:
         if image:
             image_url = await save_uploaded_image(image)
-            image_urls.append(image_url)
-    # If new images are uploaded, delete old images from disk if not referenced elsewhere
-    if image_urls and product.images:
-        old_images = product.images.split(",")
+            new_image_urls.append(image_url)
+
+    # Combine existing and new images
+    all_image_urls = existing_image_urls + new_image_urls
+
+    # If we have new images or existing images to keep, update the product
+    if all_image_urls:
+        # Delete old images that are no longer needed
+        if product.images:
+            old_images = parse_images_field(product.images)
+            for old_image in old_images:
+                # Only delete if this image is not in the new list
+                if old_image not in all_image_urls:
+                    # Check if this image is referenced by any other product
+                    other = (
+                        db.query(ProductDB)
+                        .filter(ProductDB.images.like(f"%{old_image}%"), ProductDB.id != product_id)
+                        .first()
+                    )
+                    if not other:
+                        # Remove leading slash if present
+                        filename = old_image.split("/")[-1]
+                        file_path = ARTIFACTS_DIR / filename
+                        if file_path.exists():
+                            try:
+                                os.remove(file_path)
+                            except Exception as e:
+                                print(f"Failed to delete old image {file_path}: {e}")
+
+        product.images = store_images_field(all_image_urls)
+    else:
+        # No images left, clear the field
+        product.images = None
+
+    # Update fields
+    product.name = name
+    product.sku = sku
+    product.price = price
+    product.page_url = page_url
+    product.category = category
+
+    db.commit()
+    db.refresh(product)
+    return {"msg": "Product updated successfully", "id": product.id}
+
+
+@router.delete("/products/{product_id}")
+async def delete_product(
+    product_id: str,
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+):
+    product = (
+        db.query(ProductDB)
+        .filter(ProductDB.id == product_id, ProductDB.user_id == current_user.id)
+        .first()
+    )
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    # Delete associated images from disk if not referenced elsewhere
+    if product.images:
+        old_images = parse_images_field(product.images)
         for old_image in old_images:
             # Check if this image is referenced by any other product
             other = (
@@ -415,17 +533,12 @@ async def update_product(
                         os.remove(file_path)
                     except Exception as e:
                         print(f"Failed to delete old image {file_path}: {e}")
-    # Update fields
-    product.name = name
-    product.sku = sku
-    product.price = price
-    product.page_url = page_url
-    product.category = category
-    if image_urls:
-        product.images = ",".join(image_urls)
+
+    # Delete the product
+    db.delete(product)
     db.commit()
-    db.refresh(product)
-    return {"msg": "Product updated successfully", "id": product.id}
+
+    return {"msg": "Product deleted successfully"}
 
 
 def get_user_by_api_key(
@@ -755,3 +868,620 @@ def get_usage_analytics(
         "totalCreditsPurchased": total_credits_purchased,
         "costPerCredit": cost_per_credit,
     }
+
+
+@router.post("/widget-analytics")
+async def widget_analytics(request: Request):
+    data = await request.json()
+    # Use apiKey as client_id
+    client_id = data.get("apiKey")
+    event = data.get("event")
+    timestamp = data.get("timestamp")
+    product_id = data.get("productId") or data.get("product_id")
+    # Store the rest as event_data (excluding above fields)
+    event_data = {
+        k: v
+        for k, v in data.items()
+        if k not in ["apiKey", "event", "timestamp", "productId", "product_id"]
+    }
+    visitor_id = data.get("visitorId")
+    session_visitor_id = data.get("sessionVisitorId")
+    # Parse timestamp string to datetime object if needed
+    if isinstance(timestamp, str):
+        try:
+            timestamp = isoparse(timestamp)
+        except Exception:
+            from datetime import datetime
+
+            timestamp = datetime.utcnow()
+    # Store in DB
+    db = SessionLocal()
+    db_event = WidgetAnalyticsEventDB(
+        client_id=client_id,
+        event=event,
+        timestamp=timestamp,
+        product_id=product_id,
+        event_data=event_data,
+        visitor_id=visitor_id,
+        session_visitor_id=session_visitor_id,
+    )
+    db.add(db_event)
+    db.commit()
+    db.close()
+    return {"status": "ok"}
+
+
+@router.get("/analytics/summary")
+def analytics_summary(
+    start_date: str = None,
+    end_date: str = None,
+    period: str = Query("daily", enum=["daily", "weekly", "monthly"]),
+):
+    db = SessionLocal()
+    from datetime import datetime, timedelta
+    from dateutil.relativedelta import relativedelta
+
+    # Parse date range
+    today = datetime.utcnow().date()
+    if end_date:
+        end = datetime.fromisoformat(end_date).date()
+    else:
+        end = today
+    if start_date:
+        start = datetime.fromisoformat(start_date).date()
+    else:
+        # Default to last 7 days for daily, last 4 weeks for weekly, last 3 months for monthly
+        if period == "daily":
+            start = end - timedelta(days=6)
+        elif period == "weekly":
+            start = end - timedelta(weeks=3)
+        else:  # monthly
+            start = end - relativedelta(months=2)
+    # Make end inclusive by adding 1 day and using < end_exclusive
+    from datetime import timedelta as td
+
+    end_exclusive = end + td(days=1)
+    # Previous period
+    if period == "daily":
+        period_days = (end - start).days + 1
+        prev_end = start - timedelta(days=1)
+        prev_start = prev_end - timedelta(days=period_days - 1)
+    elif period == "weekly":
+        period_weeks = ((end - start).days + 1) // 7
+        prev_end = start - timedelta(days=1)
+        prev_start = prev_end - timedelta(weeks=period_weeks - 1)
+    else:  # monthly
+        period_months = (end.year - start.year) * 12 + end.month - start.month + 1
+        prev_end = start - relativedelta(days=1)
+        prev_start = prev_end - relativedelta(months=period_months - 1)
+    prev_end_exclusive = prev_end + td(days=1)
+
+    # Helper to get counts for a period (inclusive end)
+    def get_counts(start, end_exclusive):
+        total_events = (
+            db.query(func.count(WidgetAnalyticsEventDB.id))
+            .filter(
+                WidgetAnalyticsEventDB.timestamp >= start,
+                WidgetAnalyticsEventDB.timestamp < end_exclusive,
+            )
+            .scalar()
+        )
+        total_tryons = (
+            db.query(func.count())
+            .filter(
+                WidgetAnalyticsEventDB.event == "tryon_generation_success",
+                WidgetAnalyticsEventDB.timestamp >= start,
+                WidgetAnalyticsEventDB.timestamp < end_exclusive,
+            )
+            .scalar()
+        )
+        total_errors = (
+            db.query(func.count())
+            .filter(
+                WidgetAnalyticsEventDB.event == "error_event",
+                WidgetAnalyticsEventDB.timestamp >= start,
+                WidgetAnalyticsEventDB.timestamp < end_exclusive,
+            )
+            .scalar()
+        )
+        widget_opens = (
+            db.query(func.count())
+            .filter(
+                WidgetAnalyticsEventDB.event == "widget_opened",
+                WidgetAnalyticsEventDB.timestamp >= start,
+                WidgetAnalyticsEventDB.timestamp < end_exclusive,
+            )
+            .scalar()
+        )
+        unique_visitors = (
+            db.query(func.count(func.distinct(WidgetAnalyticsEventDB.visitor_id)))
+            .filter(
+                WidgetAnalyticsEventDB.visitor_id != None,
+                WidgetAnalyticsEventDB.timestamp >= start,
+                WidgetAnalyticsEventDB.timestamp < end_exclusive,
+            )
+            .scalar()
+        )
+        unique_sessions = (
+            db.query(func.count(func.distinct(WidgetAnalyticsEventDB.session_visitor_id)))
+            .filter(
+                WidgetAnalyticsEventDB.session_visitor_id != None,
+                WidgetAnalyticsEventDB.timestamp >= start,
+                WidgetAnalyticsEventDB.timestamp < end_exclusive,
+            )
+            .scalar()
+        )
+        photo_uploads = (
+            db.query(func.count())
+            .filter(
+                WidgetAnalyticsEventDB.event.in_(["photo_uploaded", "photo_captured"]),
+                WidgetAnalyticsEventDB.timestamp >= start,
+                WidgetAnalyticsEventDB.timestamp < end_exclusive,
+            )
+            .scalar()
+        )
+        return {
+            "totalEvents": total_events,
+            "totalTryOns": total_tryons,
+            "totalErrors": total_errors,
+            "widgetOpens": widget_opens,
+            "uniqueVisitors": unique_visitors,
+            "uniqueSessions": unique_sessions,
+            "photoUploads": photo_uploads,
+        }
+
+    # Get current and previous period counts
+    counts = get_counts(start, end_exclusive)
+    prev_counts = get_counts(prev_start, prev_end_exclusive)
+    # Trends (per period in range)
+    trends = []
+    if period == "daily":
+        for i in range(period_days):
+            day = start + timedelta(days=i)
+            day_exclusive = day + td(days=1)
+            count = (
+                db.query(func.count())
+                .filter(
+                    WidgetAnalyticsEventDB.event == "tryon_generation_success",
+                    WidgetAnalyticsEventDB.timestamp >= day,
+                    WidgetAnalyticsEventDB.timestamp < day_exclusive,
+                )
+                .scalar()
+            )
+            trends.append({"date": day.isoformat(), "count": count})
+    elif period == "weekly":
+        # Group by weeks
+        current = start
+        while current <= end:
+            week_end = min(current + timedelta(days=6), end)
+            week_end_exclusive = week_end + td(days=1)
+            count = (
+                db.query(func.count())
+                .filter(
+                    WidgetAnalyticsEventDB.event == "tryon_generation_success",
+                    WidgetAnalyticsEventDB.timestamp >= current,
+                    WidgetAnalyticsEventDB.timestamp < week_end_exclusive,
+                )
+                .scalar()
+            )
+            trends.append({"date": current.isoformat(), "count": count})
+            current = week_end + timedelta(days=1)
+    else:  # monthly
+        # Group by months
+        current = start.replace(day=1)
+        while current <= end:
+            if current.month == 12:
+                next_month = current.replace(year=current.year + 1, month=1)
+            else:
+                next_month = current.replace(month=current.month + 1)
+            month_end = min(next_month - timedelta(days=1), end)
+            month_end_exclusive = month_end + td(days=1)
+            count = (
+                db.query(func.count())
+                .filter(
+                    WidgetAnalyticsEventDB.event == "tryon_generation_success",
+                    WidgetAnalyticsEventDB.timestamp >= current,
+                    WidgetAnalyticsEventDB.timestamp < month_end_exclusive,
+                )
+                .scalar()
+            )
+            trends.append({"date": current.isoformat(), "count": count})
+            current = next_month
+    # Top products (with name and image, in range)
+    top_products_raw = (
+        db.query(WidgetAnalyticsEventDB.product_id, func.count())
+        .filter(
+            WidgetAnalyticsEventDB.product_id != None,
+            WidgetAnalyticsEventDB.timestamp >= start,
+            WidgetAnalyticsEventDB.timestamp < end_exclusive,
+        )
+        .group_by(WidgetAnalyticsEventDB.product_id)
+        .order_by(func.count().desc())
+        .limit(5)
+        .all()
+    )
+    top_products = []
+    for row in top_products_raw:
+        product_id, count = row
+        product = db.query(ProductDB).filter(ProductDB.id == product_id).first()
+        if product:
+            images = product.images.split(",") if product.images else []
+            top_products.append(
+                {
+                    "productId": product_id,
+                    "name": product.name,
+                    "image": images[0] if images else None,
+                    "count": count,
+                }
+            )
+        else:
+            top_products.append(
+                {"productId": product_id, "name": product_id, "image": None, "count": count}
+            )
+    db.close()
+    return {
+        "kpis": {
+            **counts,
+            "prev": prev_counts,
+            "start": start.isoformat(),
+            "end": end.isoformat(),
+            "prevStart": prev_start.isoformat(),
+            "prevEnd": prev_end.isoformat(),
+        },
+        "trends": {
+            "tryOns": trends,
+        },
+        "topProducts": top_products,
+        "period": period,
+    }
+
+
+@router.post("/import/analyze-file")
+async def analyze_file_data(
+    file: UploadFile = File(...),
+    field_mapping: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+):
+    """Analyze CSV or Excel data for import validation."""
+    try:
+        # Parse field mapping
+        field_mapping_dict = json.loads(field_mapping)
+
+        # Check file extension
+        file_extension = file.filename.split(".")[-1].lower() if file.filename else ""
+
+        # Read file content
+        content = await file.read()
+
+        # Parse data based on file type
+        if file_extension in ["csv"]:
+            # Handle CSV files
+            text = content.decode("utf-8")
+            lines = text.split("\n")
+            lines = [line.strip() for line in lines if line.strip()]
+
+            if len(lines) < 2:
+                return {"error": "CSV file must have at least a header row and one data row"}
+
+            # Parse headers and data
+            headers = lines[0].split(",")
+            headers = [h.strip() for h in headers]
+
+            file_data = []
+            for line in lines[1:]:
+                values = line.split(",")
+                values = [v.strip() for v in values]
+                row = {}
+                for i, header in enumerate(headers):
+                    row[header] = values[i] if i < len(values) else ""
+                file_data.append(row)
+
+        elif file_extension in ["xlsx", "xls"]:
+            # Handle Excel files
+            try:
+                df = pd.read_excel(io.BytesIO(content))
+                if df.empty or len(df.columns) == 0:
+                    return {"error": "Excel file is empty or has no data"}
+
+                # Convert DataFrame to list of dictionaries
+                headers = df.columns.tolist()
+                file_data = df.to_dict("records")
+
+                # Convert all values to strings for consistency
+                for row in file_data:
+                    for key in row:
+                        if pd.isna(row[key]):
+                            row[key] = ""
+                        else:
+                            row[key] = str(row[key]).strip()
+
+            except Exception as e:
+                return {"error": f"Failed to read Excel file: {str(e)}"}
+        else:
+            return {
+                "error": f"Unsupported file format: {file_extension}. Supported formats: csv, xlsx, xls"
+            }
+
+        # Extract mapped field names
+        name_field = field_mapping_dict.get("name", "")
+        sku_field = field_mapping_dict.get("sku", "")
+        price_field = field_mapping_dict.get("price", "")
+        category_field = field_mapping_dict.get("category", "")
+        image_url_field = field_mapping_dict.get("image_url", "")
+
+        # Analyze the data
+        total_rows = len(file_data)
+        unique_skus = set()
+        products_with_images = 0
+        products_with_prices = 0
+        products_with_categories = 0
+        products_with_urls = 0
+        price_range = {"min": None, "max": None}
+        categories = set()
+
+        # Track SKU duplicates and missing required fields
+        sku_duplicates = {}
+        missing_names = 0
+        missing_skus = 0
+
+        for row in file_data:
+            # Count unique SKUs
+            sku = row.get(sku_field, "").strip()
+            if sku:
+                unique_skus.add(sku)
+                if sku in sku_duplicates:
+                    sku_duplicates[sku] += 1
+                else:
+                    sku_duplicates[sku] = 1
+
+            # Check required fields
+            name = row.get(name_field, "").strip()
+            if not name:
+                missing_names += 1
+            if not sku:
+                missing_skus += 1
+
+            # Count products with optional fields
+            if row.get(image_url_field, "").strip():
+                products_with_images += 1
+            if row.get(price_field, "").strip():
+                products_with_prices += 1
+                try:
+                    price = float(row.get(price_field, "0"))
+                    if price_range["min"] is None or price < price_range["min"]:
+                        price_range["min"] = price
+                    if price_range["max"] is None or price > price_range["max"]:
+                        price_range["max"] = price
+                except (ValueError, TypeError):
+                    pass
+            if row.get(category_field, "").strip():
+                products_with_categories += 1
+                categories.add(row.get(category_field, "").strip())
+            if row.get(field_mapping_dict.get("page_url", ""), "").strip():
+                products_with_urls += 1
+
+        # Find SKUs with multiple images
+        skus_with_multiple_images = {
+            sku: count for sku, count in sku_duplicates.items() if count > 1
+        }
+
+        # Calculate statistics
+        stats = {
+            "totalRows": total_rows,
+            "uniqueSkus": len(unique_skus),
+            "totalProducts": len(unique_skus),
+            "productsWithImages": products_with_images,
+            "productsWithPrices": products_with_prices,
+            "productsWithCategories": products_with_categories,
+            "productsWithUrls": products_with_urls,
+            "missingNames": missing_names,
+            "missingSkus": missing_skus,
+            "priceRange": price_range,
+            "categories": list(categories),
+            "categoryCount": len(categories),
+            "skusWithMultipleImages": len(skus_with_multiple_images),
+            "imageDistribution": {
+                "productsWith1Image": 0,
+                "productsWith2Images": 0,
+                "productsWith3PlusImages": 0,
+            },
+        }
+
+        # Calculate image distribution
+        for sku, count in sku_duplicates.items():
+            if count == 1:
+                stats["imageDistribution"]["productsWith1Image"] += 1
+            elif count == 2:
+                stats["imageDistribution"]["productsWith2Images"] += 1
+            else:
+                stats["imageDistribution"]["productsWith3PlusImages"] += 1
+
+        # Validation warnings
+        warnings = []
+        if missing_names > 0:
+            warnings.append(f"{missing_names} rows are missing product names")
+        if missing_skus > 0:
+            warnings.append(f"{missing_skus} rows are missing SKUs")
+        if len(skus_with_multiple_images) > 0:
+            warnings.append(
+                f"{len(skus_with_multiple_images)} products have multiple images (this is expected)"
+            )
+        if not categories:
+            warnings.append("No categories found in the data")
+
+        return {
+            "stats": stats,
+            "warnings": warnings,
+            "fieldMapping": field_mapping_dict,
+            "fileType": file_extension,
+        }
+
+    except Exception as e:
+        return {"error": f"Failed to analyze file data: {str(e)}"}
+
+
+@router.post("/import/execute")
+async def execute_import(
+    file: UploadFile = File(...),
+    field_mapping: str = Form(...),
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+):
+    """Execute the import by adding products to the database."""
+    try:
+        # Parse field mapping
+        field_mapping_dict = json.loads(field_mapping)
+
+        # Check file extension
+        file_extension = file.filename.split(".")[-1].lower() if file.filename else ""
+
+        # Read file content
+        content = await file.read()
+
+        # Parse data based on file type
+        if file_extension in ["csv"]:
+            # Handle CSV files
+            text = content.decode("utf-8")
+            lines = text.split("\n")
+            lines = [line.strip() for line in lines if line.strip()]
+
+            if len(lines) < 2:
+                return {"error": "CSV file must have at least a header row and one data row"}
+
+            # Parse headers and data
+            headers = lines[0].split(",")
+            headers = [h.strip() for h in headers]
+
+            file_data = []
+            for line in lines[1:]:
+                values = line.split(",")
+                values = [v.strip() for v in values]
+                row = {}
+                for i, header in enumerate(headers):
+                    row[header] = values[i] if i < len(values) else ""
+                file_data.append(row)
+
+        elif file_extension in ["xlsx", "xls"]:
+            # Handle Excel files
+            try:
+                df = pd.read_excel(io.BytesIO(content))
+                if df.empty or len(df.columns) == 0:
+                    return {"error": "Excel file is empty or has no data"}
+
+                # Convert DataFrame to list of dictionaries
+                headers = df.columns.tolist()
+                file_data = df.to_dict("records")
+
+                # Convert all values to strings for consistency
+                for row in file_data:
+                    for key in row:
+                        if pd.isna(row[key]):
+                            row[key] = ""
+                        else:
+                            row[key] = str(row[key]).strip()
+
+            except Exception as e:
+                return {"error": f"Failed to read Excel file: {str(e)}"}
+        else:
+            return {
+                "error": f"Unsupported file format: {file_extension}. Supported formats: csv, xlsx, xls"
+            }
+
+        # Extract mapped field names
+        name_field = field_mapping_dict.get("name", "")
+        sku_field = field_mapping_dict.get("sku", "")
+        price_field = field_mapping_dict.get("price", "")
+        category_field = field_mapping_dict.get("category", "")
+        image_url_field = field_mapping_dict.get("image_url", "")
+        page_url_field = field_mapping_dict.get("page_url", "")
+
+        # Group data by SKU to handle multiple images per product
+        products_by_sku = {}
+
+        for row in file_data:
+            sku = row.get(sku_field, "").strip()
+            if not sku:
+                continue  # Skip rows without SKU
+
+            if sku not in products_by_sku:
+                products_by_sku[sku] = {
+                    "name": row.get(name_field, "").strip(),
+                    "sku": sku,
+                    "price": None,
+                    "page_url": row.get(page_url_field, "").strip(),
+                    "category": row.get(category_field, "").strip(),
+                    "images": [],
+                }
+
+                # Parse price if available
+                price_str = row.get(price_field, "").strip()
+                if price_str:
+                    try:
+                        products_by_sku[sku]["price"] = float(price_str)
+                    except (ValueError, TypeError):
+                        pass
+
+            # Add image URL if available (filter out blob URLs and invalid URLs)
+            image_url = row.get(image_url_field, "").strip()
+            if image_url and image_url not in products_by_sku[sku]["images"]:
+                # Filter out blob URLs and invalid URLs
+                if not image_url.startswith("blob:") and not image_url.startswith("data:"):
+                    # Basic validation - should be a valid URL or relative path
+                    if (
+                        image_url.startswith("http://")
+                        or image_url.startswith("https://")
+                        or image_url.startswith("/")
+                    ):
+                        products_by_sku[sku]["images"].append(image_url)
+                    else:
+                        # Skip invalid URLs
+                        print(f"Skipping invalid image URL for SKU {sku}: {image_url}")
+
+        # Import products to database
+        imported_count = 0
+        skipped_count = 0
+        errors = []
+
+        for sku, product_data in products_by_sku.items():
+            try:
+                # Check for duplicate SKU
+                existing_product = (
+                    db.query(ProductDB)
+                    .filter(ProductDB.sku == sku, ProductDB.user_id == current_user.id)
+                    .first()
+                )
+
+                if existing_product:
+                    skipped_count += 1
+                    continue
+
+                # Create product
+                db_product = ProductDB(
+                    user_id=current_user.id,
+                    name=product_data["name"],
+                    sku=product_data["sku"],
+                    price=product_data["price"],
+                    page_url=product_data["page_url"] if product_data["page_url"] else None,
+                    category=product_data["category"] if product_data["category"] else None,
+                    images=store_images_field(product_data["images"]),
+                )
+                db.add(db_product)
+                imported_count += 1
+
+            except Exception as e:
+                errors.append(f"Error importing {sku}: {str(e)}")
+
+        # Commit all changes
+        db.commit()
+
+        return {
+            "success": True,
+            "imported": imported_count,
+            "skipped": skipped_count,
+            "errors": errors,
+            "total_processed": len(products_by_sku),
+        }
+
+    except Exception as e:
+        return {"error": f"Failed to execute import: {str(e)}"}
