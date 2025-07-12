@@ -745,6 +745,35 @@ def get_stripe_transactions(
     return transactions
 
 
+@router.get("/credit-purchases", response_model=List[CreditInvoice])
+def get_credit_purchases(
+    db: Session = Depends(get_db),
+    current_user: UserDB = Depends(get_current_user),
+    limit: int = Query(10, ge=1, le=50),
+):
+    """Get recent credit purchases from the database."""
+    purchases = (
+        db.query(CreditPurchaseDB)
+        .filter(CreditPurchaseDB.user_id == current_user.id)
+        .order_by(CreditPurchaseDB.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
+
+    transactions = []
+    for purchase in purchases:
+        transactions.append(
+            CreditInvoice(
+                id=purchase.id,
+                date=purchase.timestamp.isoformat(),
+                amount=purchase.amount,
+                description=purchase.description or f"Purchase of {purchase.credits} credits",
+                downloadUrl=purchase.download_url,
+            )
+        )
+    return transactions
+
+
 @router.get("/usage/analytics")
 def get_usage_analytics(
     db: Session = Depends(get_db),
@@ -839,6 +868,11 @@ def get_usage_analytics(
         # Calculate balance at the end of this period
         period_events = [e for e in all_events if e["timestamp"] < next_bucket]
         balance = sum(e["amount"] for e in period_events)
+
+        # Ensure the last datapoint matches current available credits
+        if i == len(buckets) - 1:  # Last bucket
+            balance = current_user.credits
+
         balance_history.append(
             {
                 "date": bucket.strftime("%Y-%m-%d")
